@@ -1,0 +1,147 @@
+
+import { useState } from "react";
+import { Download, FileText, AlertTriangle } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Separator } from "@/components/ui/separator";
+import { useToast } from "@/hooks/use-toast";
+
+interface Category {
+  id: number;
+  name: string;
+  count: number;
+  description: string;
+  color: string;
+}
+
+interface ExportDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  selectedCategories: Category[];
+}
+
+export const ExportDialog = ({ open, onOpenChange, selectedCategories }: ExportDialogProps) => {
+  const [exporting, setExporting] = useState(false);
+  const { toast } = useToast();
+
+  const totalContacts = selectedCategories.reduce((sum, cat) => sum + cat.count, 0);
+  const totalFiles = Math.ceil(totalContacts / 25000);
+  const largeCategories = selectedCategories.filter(cat => cat.count > 25000);
+
+  const handleExport = async () => {
+    setExporting(true);
+
+    try {
+      // TODO: Implement actual Supabase export logic
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      toast({
+        title: "Export started",
+        description: `Generating ${totalFiles} CSV file(s) with ${totalContacts.toLocaleString()} contacts.`,
+      });
+      
+      onOpenChange(false);
+    } catch (error) {
+      toast({
+        title: "Export failed",
+        description: "Please try again or contact support.",
+        variant: "destructive",
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Export Customer Data</DialogTitle>
+          <DialogDescription>
+            Download selected categories as CSV files (max 25,000 contacts per file).
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {/* Export Summary */}
+          <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="font-medium">Total Contacts:</span>
+              <Badge className="bg-blue-100 text-blue-800">
+                {totalContacts.toLocaleString()}
+              </Badge>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="font-medium">CSV Files:</span>
+              <Badge className="bg-green-100 text-green-800">
+                {totalFiles}
+              </Badge>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Selected Categories */}
+          <div>
+            <h4 className="font-medium mb-3">Selected Categories</h4>
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {selectedCategories.map((category) => (
+                <div key={category.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                  <div className="flex items-center space-x-3">
+                    <div className={`w-3 h-3 rounded-full ${category.color}`} />
+                    <span className="text-sm font-medium">{category.name}</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Badge variant="secondary" className="text-xs">
+                      {category.count.toLocaleString()}
+                    </Badge>
+                    {category.count > 25000 && (
+                      <Badge variant="outline" className="text-xs">
+                        {Math.ceil(category.count / 25000)} files
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {largeCategories.length > 0 && (
+            <Alert>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                {largeCategories.length} categor{largeCategories.length === 1 ? 'y' : 'ies'} will be split into multiple files due to the 25,000 contact limit per file.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <div className="flex justify-end space-x-2">
+            <Button
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={exporting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleExport}
+              disabled={exporting}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              {exporting ? "Preparing..." : "Export CSV Files"}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
