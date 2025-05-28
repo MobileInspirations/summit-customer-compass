@@ -11,8 +11,8 @@ import { CategoryCard } from "@/components/CategoryCard";
 import { UploadDialog } from "@/components/UploadDialog";
 import { ExportDialog } from "@/components/ExportDialog";
 
-// Mock data for the 10 categories - this will be replaced with Supabase data
-const categories = [
+// Current customer categories - this will be replaced with Supabase data
+const customerCategories = [
   { id: 1, name: "VIP Attendees", count: 15420, description: "High-value summit participants", color: "bg-purple-500" },
   { id: 2, name: "Multi-Event Participants", count: 23680, description: "Attended 3+ summits", color: "bg-blue-500" },
   { id: 3, name: "Recent Registrants", count: 18290, description: "Registered in last 6 months", color: "bg-green-500" },
@@ -25,13 +25,28 @@ const categories = [
   { id: 10, name: "New Prospects", count: 12340, description: "Never attended events", color: "bg-yellow-500" },
 ];
 
+// Predefined business categories
+const businessCategories = [
+  { id: 11, name: "Holistic Wellness & Natural Living", count: 42350, description: "Natural health and wellness enthusiasts", color: "bg-emerald-600" },
+  { id: 12, name: "Targeted Health Solutions & Disease Management", count: 38920, description: "Disease-specific health solutions", color: "bg-red-600" },
+  { id: 13, name: "Fitness, Nutrition & Weight Management", count: 35480, description: "Fitness and nutrition focused", color: "bg-orange-600" },
+  { id: 14, name: "Mental & Emotional Well-being", count: 29760, description: "Mental health and emotional wellness", color: "bg-purple-600" },
+  { id: 15, name: "Women's Health & Community", count: 41200, description: "Women-focused health topics", color: "bg-pink-600" },
+  { id: 16, name: "Longevity & Regenerative Health", count: 27890, description: "Anti-aging and regenerative medicine", color: "bg-cyan-600" },
+  { id: 17, name: "Digital Marketing & Content Creation Skills", count: 33670, description: "Marketing and content creation", color: "bg-blue-600" },
+  { id: 18, name: "Entrepreneurship & Business Development", count: 31540, description: "Business growth and entrepreneurship", color: "bg-indigo-600" },
+  { id: 19, name: "Investing, Finance & Wealth Creation", count: 28430, description: "Financial education and investing", color: "bg-green-600" },
+  { id: 20, name: "Self-Reliance & Preparedness", count: 24780, description: "Self-sufficiency and preparedness", color: "bg-yellow-600" },
+];
+
 const Index = () => {
   const [selectedCategories, setSelectedCategories] = useState<number[]>([]);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
   const { toast } = useToast();
 
-  const totalContacts = categories.reduce((sum, cat) => sum + cat.count, 0);
+  const allCategories = [...customerCategories, ...businessCategories];
+  const totalContacts = allCategories.reduce((sum, cat) => sum + cat.count, 0);
 
   const handleCategorySelect = (categoryId: number) => {
     setSelectedCategories(prev => 
@@ -53,7 +68,7 @@ const Index = () => {
     setShowExportDialog(true);
   };
 
-  const selectedCount = categories
+  const selectedCount = allCategories
     .filter(cat => selectedCategories.includes(cat.id))
     .reduce((sum, cat) => sum + cat.count, 0);
 
@@ -107,7 +122,7 @@ const Index = () => {
               <Filter className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{categories.length}</div>
+              <div className="text-2xl font-bold">{allCategories.length}</div>
             </CardContent>
           </Card>
           <Card>
@@ -133,16 +148,36 @@ const Index = () => {
           </Card>
         </div>
 
-        {/* Categories Grid */}
+        {/* Customer Categories */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-gray-900">Customer Categories</h2>
             <Badge variant="outline" className="text-sm">
-              {selectedCategories.length} of {categories.length} selected
+              {customerCategories.filter(cat => selectedCategories.includes(cat.id)).length} of {customerCategories.length} selected
             </Badge>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-            {categories.map((category) => (
+            {customerCategories.map((category) => (
+              <CategoryCard
+                key={category.id}
+                category={category}
+                isSelected={selectedCategories.includes(category.id)}
+                onSelect={() => handleCategorySelect(category.id)}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Business Categories */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-gray-900">Business Categories</h2>
+            <Badge variant="outline" className="text-sm">
+              {businessCategories.filter(cat => selectedCategories.includes(cat.id)).length} of {businessCategories.length} selected
+            </Badge>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+            {businessCategories.map((category) => (
               <CategoryCard
                 key={category.id}
                 category={category}
@@ -189,7 +224,7 @@ const Index = () => {
         open={showExportDialog} 
         onOpenChange={setShowExportDialog}
         selectedCategories={selectedCategories.map(id => 
-          categories.find(cat => cat.id === id)!
+          allCategories.find(cat => cat.id === id)!
         )}
       />
     </div>
