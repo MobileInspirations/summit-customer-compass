@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Upload, Download, Users, Database, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -168,10 +167,10 @@ const Index = () => {
           </div>
         </div>
 
-        {/* Business Categories */}
+        {/* Personality Type Buckets */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">Business Categories</h2>
+            <h2 className="text-2xl font-bold text-gray-900">Personality Type Buckets</h2>
             <Badge variant="outline" className="text-sm">
               {businessCategories.filter(cat => selectedCategories.includes(cat.id)).length} of {businessCategories.length} selected
             </Badge>
