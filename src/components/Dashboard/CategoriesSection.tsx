@@ -1,12 +1,7 @@
 
 import { Badge } from "@/components/ui/badge";
 import { CategoryCard } from "@/components/CategoryCard";
-
-interface Category {
-  id: string;
-  name: string;
-  count: number;
-}
+import type { Category } from "@/hooks/useCategories";
 
 interface CategoriesSectionProps {
   title: string;
