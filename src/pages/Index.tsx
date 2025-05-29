@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCategoriesByType } from "@/hooks/useCategories";
 import { useContactsCount } from "@/hooks/useContacts";
+import { useBucketCounts } from "@/hooks/useBucketCounts";
 import { categorizeContacts } from "@/services/contactCategorizationService";
 import { sortContacts } from "@/services/contactSortingService";
 import { exportAllTags } from "@/services/tagExportService";
@@ -41,9 +42,10 @@ const Index = () => {
   const { data: customerCategories = [], isLoading: customerLoading } = useCategoriesByType("customer");
   const { data: personalityCategories = [], isLoading: personalityLoading } = useCategoriesByType("personality");
   const { data: totalContacts = 0, isLoading: contactsLoading } = useContactsCount();
+  const { data: bucketCounts = {}, isLoading: bucketCountsLoading } = useBucketCounts();
 
   const allCategories = [...customerCategories, ...personalityCategories];
-  const isLoading = customerLoading || personalityLoading || contactsLoading;
+  const isLoading = customerLoading || personalityLoading || contactsLoading || bucketCountsLoading;
 
   const handleCategorySelect = (categoryId: string) => {
     setSelectedCategories(prev => 
@@ -214,6 +216,7 @@ const Index = () => {
         <BucketSelector
           selectedBucket={selectedBucket}
           onBucketChange={(bucket) => setSelectedBucket(bucket as MainBucketId)}
+          bucketCounts={bucketCounts}
         />
       </div>
 
