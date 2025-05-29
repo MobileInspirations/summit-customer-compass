@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { Upload, FileSpreadsheet, AlertCircle } from "lucide-react";
+import { Upload, AlertCircle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -9,22 +9,17 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
+import { parseCSV } from "@/utils/csvParser";
+import { uploadContacts } from "@/services/contactUploadService";
+import { FileUploadInput } from "@/components/FileUploadInput";
+import { UploadProgress } from "@/components/UploadProgress";
 
 interface UploadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-}
-
-interface CSVContact {
-  email: string;
-  name?: string;
-  company?: string;
-  summit_history?: string;
 }
 
 export const UploadDialog = ({ open, onOpenChange }: UploadDialogProps) => {
@@ -34,103 +29,16 @@ export const UploadDialog = ({ open, onOpenChange }: UploadDialogProps) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = event.target.files?.[0];
-    if (selectedFile && selectedFile.type === "text/csv") {
-      setFile(selectedFile);
-    } else {
+  const handleFileChange = (selectedFile: File | null) => {
+    if (!selectedFile) {
       toast({
         title: "Invalid file type",
         description: "Please select a CSV file.",
         variant: "destructive",
       });
+      return;
     }
-  };
-
-  const parseCSVLine = (line: string): string[] => {
-    const result: string[] = [];
-    let current = '';
-    let inQuotes = false;
-    
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i];
-      
-      if (char === '"') {
-        if (inQuotes && line[i + 1] === '"') {
-          // Handle escaped quotes
-          current += '"';
-          i++; // Skip next quote
-        } else {
-          inQuotes = !inQuotes;
-        }
-      } else if (char === ',' && !inQuotes) {
-        result.push(current.trim());
-        current = '';
-      } else {
-        current += char;
-      }
-    }
-    
-    result.push(current.trim());
-    return result;
-  };
-
-  const parseCSV = (csvText: string): CSVContact[] => {
-    console.log('Starting CSV parsing...');
-    
-    // Split by lines and filter out empty lines
-    const lines = csvText.split(/\r?\n/).filter(line => line.trim());
-    console.log(`Found ${lines.length} lines in CSV`);
-    
-    if (lines.length < 2) {
-      console.log('CSV has less than 2 lines');
-      return [];
-    }
-
-    // Parse header row
-    const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().trim());
-    console.log('Headers found:', headers);
-    
-    const contacts: CSVContact[] = [];
-
-    for (let i = 1; i < lines.length; i++) {
-      const values = parseCSVLine(lines[i]);
-      console.log(`Row ${i}:`, values);
-      
-      const contact: CSVContact = { email: '' };
-
-      headers.forEach((header, index) => {
-        const value = values[index]?.trim() || '';
-        
-        // Updated header matching for your specific CSV format
-        if (header === 'email' || header.includes('email')) {
-          contact.email = value;
-        } else if (header === 'first name' || header === 'name' || header.includes('first') || header.includes('name')) {
-          contact.name = value;
-        } else if (header.includes('company') || header.includes('organization') || header.includes('business')) {
-          contact.company = value;
-        } else if (header === 'contact tags' || header.includes('tags') || header.includes('summit') || header.includes('history')) {
-          // Handle contact tags which might be comma-separated
-          if (value) {
-            contact.summit_history = value.replace(/,/g, ';'); // Convert commas to semicolons for our format
-          }
-        }
-      });
-
-      console.log(`Parsed contact:`, contact);
-
-      // Validate email format
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (contact.email && emailRegex.test(contact.email)) {
-        contacts.push(contact);
-        console.log(`Valid contact added: ${contact.email}`);
-      } else {
-        console.log(`Skipping invalid contact - email: "${contact.email}"`);
-      }
-    }
-
-    console.log(`Total valid contacts found: ${contacts.length}`);
-    return contacts;
+    setFile(selectedFile);
   };
 
   const handleUpload = async () => {
@@ -152,41 +60,8 @@ export const UploadDialog = ({ open, onOpenChange }: UploadDialogProps) => {
       }
 
       setProgress(20);
-      console.log(`Processing ${contacts.length} contacts...`);
-
-      // Process contacts in batches
-      const batchSize = 50;
-      let processed = 0;
       
-      for (let i = 0; i < contacts.length; i += batchSize) {
-        const batch = contacts.slice(i, i + batchSize);
-        
-        // Prepare data for insertion
-        const contactsToInsert = batch.map(contact => ({
-          email: contact.email,
-          full_name: contact.name || null,
-          company: contact.company || null,
-          summit_history: contact.summit_history ? contact.summit_history.split(';').filter(Boolean) : []
-        }));
-
-        console.log(`Inserting batch ${Math.floor(i / batchSize) + 1}:`, contactsToInsert);
-
-        // Insert batch with upsert to handle duplicates
-        const { error } = await supabase
-          .from('contacts')
-          .upsert(contactsToInsert, { 
-            onConflict: 'email',
-            ignoreDuplicates: false 
-          });
-
-        if (error) {
-          console.error('Error inserting batch:', error);
-          throw error;
-        }
-
-        processed += batch.length;
-        setProgress(20 + (processed / contacts.length) * 70);
-      }
+      await uploadContacts(contacts, setProgress);
 
       setProgress(100);
       
@@ -236,38 +111,13 @@ export const UploadDialog = ({ open, onOpenChange }: UploadDialogProps) => {
             </AlertDescription>
           </Alert>
 
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-            <input
-              type="file"
-              accept=".csv"
-              onChange={handleFileChange}
-              className="hidden"
-              id="file-upload"
-              disabled={uploading}
-            />
-            <label
-              htmlFor="file-upload"
-              className="cursor-pointer flex flex-col items-center space-y-2"
-            >
-              <FileSpreadsheet className="w-12 h-12 text-gray-400" />
-              <span className="text-sm font-medium">
-                {file ? file.name : "Choose CSV file"}
-              </span>
-              <span className="text-xs text-gray-500">
-                Maximum file size: 50MB
-              </span>
-            </label>
-          </div>
+          <FileUploadInput
+            file={file}
+            onFileChange={handleFileChange}
+            disabled={uploading}
+          />
 
-          {uploading && (
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>Processing...</span>
-                <span>{progress}%</span>
-              </div>
-              <Progress value={progress} />
-            </div>
-          )}
+          {uploading && <UploadProgress progress={progress} />}
 
           <div className="flex justify-end space-x-2">
             <Button
