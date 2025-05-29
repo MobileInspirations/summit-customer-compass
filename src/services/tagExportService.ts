@@ -2,40 +2,50 @@
 import { supabase } from "@/integrations/supabase/client";
 
 export const exportAllTags = async () => {
-  console.log("Exporting all tags/categories");
+  console.log("Exporting all tags from contact summit_history");
   
-  // Get all categories with their contact counts
-  const { data: categories, error: categoriesError } = await supabase
-    .from("customer_categories")
-    .select("*")
-    .order("name");
+  // Get all contacts with their summit_history tags
+  const { data: contacts, error: contactsError } = await supabase
+    .from("contacts")
+    .select("id, email, full_name, company, summit_history")
+    .not("summit_history", "is", null);
 
-  if (categoriesError) {
-    console.error("Error fetching categories:", categoriesError);
-    throw new Error("Failed to fetch categories");
+  if (contactsError) {
+    console.error("Error fetching contacts:", contactsError);
+    throw new Error("Failed to fetch contacts");
   }
 
-  // Get contact counts for each category
-  const categoriesWithCounts = await Promise.all(
-    categories.map(async (category) => {
-      const { count, error: countError } = await supabase
-        .from("contact_categories")
-        .select("*", { count: "exact", head: true })
-        .eq("category_id", category.id);
+  if (!contacts || contacts.length === 0) {
+    console.log("No contacts with tags found");
+    return [];
+  }
 
-      if (countError) {
-        console.error("Error counting contacts for category:", category.id, countError);
-        return { ...category, count: 0 };
-      }
+  // Extract all unique tags from summit_history arrays
+  const allTags = new Set<string>();
+  const tagUsageMap = new Map<string, number>();
 
-      return { ...category, count: count || 0 };
-    })
-  );
+  contacts.forEach(contact => {
+    if (contact.summit_history && Array.isArray(contact.summit_history)) {
+      contact.summit_history.forEach(tag => {
+        if (tag && typeof tag === 'string' && tag.trim()) {
+          const cleanTag = tag.trim();
+          allTags.add(cleanTag);
+          tagUsageMap.set(cleanTag, (tagUsageMap.get(cleanTag) || 0) + 1);
+        }
+      });
+    }
+  });
+
+  // Convert to array and sort by usage count (most used first)
+  const sortedTags = Array.from(allTags).map(tag => ({
+    tag,
+    usageCount: tagUsageMap.get(tag) || 0
+  })).sort((a, b) => b.usageCount - a.usageCount);
 
   // Create CSV content
-  const csvHeaders = "Category Name,Type,Description,Contact Count,Color\n";
-  const csvRows = categoriesWithCounts.map(category => 
-    `"${category.name}","${category.category_type}","${category.description || ''}",${category.count},"${category.color}"`
+  const csvHeaders = "Tag,Usage Count,Type\n";
+  const csvRows = sortedTags.map(item => 
+    `"${item.tag}",${item.usageCount},"User Tag"`
   ).join("\n");
   
   const csvContent = csvHeaders + csvRows;
@@ -45,14 +55,14 @@ export const exportAllTags = async () => {
   const link = document.createElement("a");
   const url = URL.createObjectURL(blob);
   link.setAttribute("href", url);
-  link.setAttribute("download", `all_tags_export_${new Date().toISOString().split('T')[0]}.csv`);
+  link.setAttribute("download", `all_user_tags_export_${new Date().toISOString().split('T')[0]}.csv`);
   link.style.visibility = 'hidden';
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
   
-  console.log(`Exported ${categoriesWithCounts.length} categories/tags`);
-  return categoriesWithCounts;
+  console.log(`Exported ${sortedTags.length} unique tags from ${contacts.length} contacts`);
+  return sortedTags;
 };
 
 export const exportContactsByTag = async (categoryId: string) => {
