@@ -22,34 +22,95 @@ export const categorizeContacts = async (contactIds?: string[]): Promise<void> =
     throw categoriesError;
   }
 
-  // Get contacts to categorize
-  let contactsQuery = supabase.from('contacts').select('id, email, full_name, company, summit_history');
+  console.log(`Found ${categories.length} categories`);
+
+  // Get total contact count first
+  const { count: totalContacts, error: countError } = await supabase
+    .from('contacts')
+    .select('*', { count: 'exact', head: true });
+
+  if (countError) {
+    console.error('Error counting contacts:', countError);
+    throw countError;
+  }
+
+  console.log(`Total contacts in database: ${totalContacts}`);
+
+  // Get contacts to categorize with pagination to handle large datasets
+  let allContacts: any[] = [];
+  let from = 0;
+  const batchSize = 1000; // Process in batches of 1000
   
-  if (contactIds && contactIds.length > 0) {
-    contactsQuery = contactsQuery.in('id', contactIds);
+  while (true) {
+    let contactsQuery = supabase
+      .from('contacts')
+      .select('id, email, full_name, company, summit_history')
+      .range(from, from + batchSize - 1);
+    
+    if (contactIds && contactIds.length > 0) {
+      contactsQuery = contactsQuery.in('id', contactIds);
+    }
+
+    const { data: contacts, error: contactsError } = await contactsQuery;
+
+    if (contactsError) {
+      console.error('Error fetching contacts:', contactsError);
+      throw contactsError;
+    }
+
+    if (!contacts || contacts.length === 0) {
+      break; // No more contacts to fetch
+    }
+
+    allContacts = allContacts.concat(contacts);
+    console.log(`Fetched batch: ${contacts.length} contacts (total so far: ${allContacts.length})`);
+
+    // If we got less than the batch size, we've reached the end
+    if (contacts.length < batchSize) {
+      break;
+    }
+
+    from += batchSize;
   }
 
-  const { data: contacts, error: contactsError } = await contactsQuery;
-
-  if (contactsError) {
-    console.error('Error fetching contacts:', contactsError);
-    throw contactsError;
-  }
-
-  if (!contacts || contacts.length === 0) {
+  if (allContacts.length === 0) {
     console.log('No contacts to categorize');
     return;
   }
 
-  console.log(`Categorizing ${contacts.length} contacts into ${categories.length} categories...`);
+  console.log(`Total contacts to categorize: ${allContacts.length}`);
 
-  // Categorize each contact
-  const categorizationPromises = contacts.map(contact => 
-    categorizeContact(contact as ContactForCategorization, categories)
-  );
+  // Clear existing categorizations if we're doing a full categorization
+  if (!contactIds || contactIds.length === 0) {
+    console.log('Clearing existing categorizations...');
+    const { error: clearError } = await supabase
+      .from('contact_categories')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all records
 
-  await Promise.all(categorizationPromises);
-  console.log('Contact categorization completed');
+    if (clearError) {
+      console.warn('Warning: Could not clear existing categorizations:', clearError);
+    }
+  }
+
+  // Process contacts in smaller batches to avoid overwhelming the database
+  const processingBatchSize = 50;
+  let processedCount = 0;
+
+  for (let i = 0; i < allContacts.length; i += processingBatchSize) {
+    const batch = allContacts.slice(i, i + processingBatchSize);
+    
+    const categorizationPromises = batch.map(contact => 
+      categorizeContact(contact as ContactForCategorization, categories)
+    );
+
+    await Promise.all(categorizationPromises);
+    processedCount += batch.length;
+    
+    console.log(`Processed ${processedCount}/${allContacts.length} contacts`);
+  }
+
+  console.log(`Contact categorization completed. Processed ${processedCount} contacts total.`);
 };
 
 const categorizeContact = async (
@@ -83,6 +144,9 @@ const categorizeContact = async (
     } else {
       console.log(`Assigned contact ${contact.email} to ${assignedCategories.length} categories`);
     }
+  } else {
+    // Log contacts that don't match any categories for debugging
+    console.log(`No categories matched for contact: ${contact.email}`);
   }
 };
 
@@ -130,13 +194,14 @@ const shouldAssignToCategory = (contact: ContactForCategorization, category: any
       );
     }
 
-    // Subscribers
-    if (categoryName.includes('subscriber') || categoryName.includes('email')) {
+    // Subscribers - make this more inclusive
+    if (categoryName.includes('subscriber') || categoryName.includes('email') || categoryName.includes('list')) {
       return summitHistory.some(event => 
         event.toLowerCase().includes('subscriber') ||
         event.toLowerCase().includes('email') ||
-        event.toLowerCase().includes('opt')
-      );
+        event.toLowerCase().includes('opt') ||
+        event.toLowerCase().includes('list')
+      ) || summitHistory.length === 0; // Include contacts with no history as potential subscribers
     }
 
     // Business/Enterprise
@@ -168,6 +233,11 @@ const shouldAssignToCategory = (contact: ContactForCategorization, category: any
         event.toLowerCase().includes('wellness')
       );
     }
+
+    // General subscriber catch-all - if no other categories match and it's a basic subscriber category
+    if (categoryName.includes('general') || categoryName.includes('basic') || categoryName === 'subscribers') {
+      return true; // All contacts can be general subscribers
+    }
   }
 
   // Personality type categorization
@@ -184,8 +254,13 @@ const shouldAssignToCategory = (contact: ContactForCategorization, category: any
       return summitHistory.length >= 3; // Multiple engagements
     }
 
-    if (categoryName.includes('new')) {
+    if (categoryName.includes('new') || categoryName.includes('fresh')) {
       return summitHistory.length <= 1; // New or low engagement
+    }
+
+    // Default personality assignment for broad categories
+    if (categoryName.includes('general') || categoryName.includes('standard')) {
+      return true;
     }
   }
 
