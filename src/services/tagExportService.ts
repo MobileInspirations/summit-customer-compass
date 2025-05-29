@@ -1,7 +1,15 @@
 
 import { supabase } from "@/integrations/supabase/client";
 
-export const exportAllTags = async () => {
+export interface TagExportProgress {
+  contactsProcessed: number;
+  totalContacts: number;
+  tagsFound: number;
+}
+
+export const exportAllTags = async (
+  onProgress?: (progress: TagExportProgress) => void
+) => {
   console.log("Exporting all tags from all contacts summit_history");
   
   // Get ALL contacts by fetching in batches to avoid Supabase limits
@@ -9,6 +17,19 @@ export const exportAllTags = async () => {
   let from = 0;
   const batchSize = 1000;
   let hasMore = true;
+
+  // First, get the total count for progress tracking
+  const { count: totalCount, error: countError } = await supabase
+    .from("contacts")
+    .select("*", { count: 'exact', head: true });
+
+  if (countError) {
+    console.error("Error getting contacts count:", countError);
+    throw new Error("Failed to get contacts count");
+  }
+
+  const totalContacts = totalCount || 0;
+  console.log(`Total contacts to process: ${totalContacts}`);
 
   while (hasMore) {
     console.log(`Fetching contacts ${from} to ${from + batchSize - 1}`);
@@ -27,6 +48,15 @@ export const exportAllTags = async () => {
       hasMore = false;
     } else {
       allContacts = [...allContacts, ...contactBatch];
+      
+      // Report progress
+      if (onProgress) {
+        onProgress({
+          contactsProcessed: allContacts.length,
+          totalContacts,
+          tagsFound: 0 // Will be calculated later
+        });
+      }
       
       // If we got less than the batch size, we've reached the end
       if (contactBatch.length < batchSize) {
@@ -50,7 +80,7 @@ export const exportAllTags = async () => {
   let contactsWithTags = 0;
   let totalTagOccurrences = 0;
 
-  allContacts.forEach(contact => {
+  allContacts.forEach((contact, index) => {
     if (contact.summit_history && Array.isArray(contact.summit_history)) {
       contactsWithTags++;
       contact.summit_history.forEach(tag => {
@@ -60,6 +90,15 @@ export const exportAllTags = async () => {
           tagUsageMap.set(cleanTag, (tagUsageMap.get(cleanTag) || 0) + 1);
           totalTagOccurrences++;
         }
+      });
+    }
+
+    // Report progress with current tag count
+    if (onProgress && (index % 100 === 0 || index === allContacts.length - 1)) {
+      onProgress({
+        contactsProcessed: allContacts.length,
+        totalContacts,
+        tagsFound: allTags.size
       });
     }
   });

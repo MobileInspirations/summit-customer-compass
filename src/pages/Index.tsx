@@ -16,6 +16,7 @@ import { BucketSelector } from "@/components/BucketSelector";
 import { UploadDialog } from "@/components/UploadDialog";
 import { ExportDialog } from "@/components/ExportDialog";
 import { CategorizationProgress } from "@/components/CategorizationProgress";
+import { ExportProgress } from "@/components/ExportProgress";
 import type { MainBucketId } from "@/services/bucketCategorizationService";
 
 const Index = () => {
@@ -32,6 +33,13 @@ const Index = () => {
     totalBatches: 0,
     processedCount: 0,
     totalCount: 0
+  });
+  const [exportProgress, setExportProgress] = useState({
+    contactsProcessed: 0,
+    totalContacts: 0,
+    tagsFound: 0,
+    isComplete: false,
+    isError: false
   });
   const { toast } = useToast();
   const { signOut } = useAuth();
@@ -131,14 +139,41 @@ const Index = () => {
 
   const handleExportAllTags = async () => {
     setIsExporting(true);
+    setExportProgress({
+      contactsProcessed: 0,
+      totalContacts: 0,
+      tagsFound: 0,
+      isComplete: false,
+      isError: false
+    });
+
     try {
-      const exportedCategories = await exportAllTags();
+      const exportedCategories = await exportAllTags((progress) => {
+        setExportProgress(prev => ({
+          ...prev,
+          contactsProcessed: progress.contactsProcessed,
+          totalContacts: progress.totalContacts,
+          tagsFound: progress.tagsFound
+        }));
+      });
+      
+      setExportProgress(prev => ({
+        ...prev,
+        isComplete: true,
+        isError: false
+      }));
+      
       toast({
         title: "Export complete",
         description: `Successfully exported ${exportedCategories.length} categories/tags to CSV file.`,
       });
     } catch (error) {
       console.error('Export error:', error);
+      setExportProgress(prev => ({
+        ...prev,
+        isComplete: true,
+        isError: true
+      }));
       toast({
         title: "Export failed",
         description: "Please try again or contact support.",
@@ -146,6 +181,15 @@ const Index = () => {
       });
     } finally {
       setIsExporting(false);
+      setTimeout(() => {
+        setExportProgress({
+          contactsProcessed: 0,
+          totalContacts: 0,
+          tagsFound: 0,
+          isComplete: false,
+          isError: false
+        });
+      }, 3000);
     }
   };
 
@@ -238,6 +282,14 @@ const Index = () => {
         totalBatches={categorizationProgress.totalBatches}
         processedCount={categorizationProgress.processedCount}
         totalCount={categorizationProgress.totalCount}
+      />
+      <ExportProgress
+        isVisible={isExporting || exportProgress.isComplete}
+        isComplete={exportProgress.isComplete}
+        isError={exportProgress.isError}
+        contactsProcessed={exportProgress.contactsProcessed}
+        totalContacts={exportProgress.totalContacts}
+        tagsFound={exportProgress.tagsFound}
       />
     </div>
   );
