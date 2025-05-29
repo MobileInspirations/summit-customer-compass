@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Upload, AlertCircle } from "lucide-react";
 import {
@@ -17,6 +16,7 @@ import { uploadContacts } from "@/services/contactUploadService";
 import { FileUploadInput } from "@/components/FileUploadInput";
 import { UploadProgress } from "@/components/UploadProgress";
 import { BucketSelector } from "@/components/BucketSelector";
+import { useBucketCounts } from "@/hooks/useBucketCounts";
 import type { MainBucketId } from "@/services/bucketCategorizationService";
 
 interface UploadDialogProps {
@@ -31,6 +31,7 @@ export const UploadDialog = ({ open, onOpenChange }: UploadDialogProps) => {
   const [progress, setProgress] = useState(0);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { data: bucketCounts = {} } = useBucketCounts();
 
   const handleFileChange = (selectedFile: File | null) => {
     if (!selectedFile) {
@@ -125,6 +126,7 @@ export const UploadDialog = ({ open, onOpenChange }: UploadDialogProps) => {
             <BucketSelector
               selectedBucket={selectedBucket}
               onBucketChange={(bucket) => setSelectedBucket(bucket as MainBucketId)}
+              bucketCounts={bucketCounts}
             />
           )}
 
