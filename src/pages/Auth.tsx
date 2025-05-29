@@ -8,6 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 
+const ALLOWED_DOMAINS = ['mopads.com', '360summits.com'];
+
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
@@ -18,9 +20,25 @@ const Auth = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  const validateEmailDomain = (email: string): boolean => {
+    const domain = email.split('@')[1];
+    return ALLOWED_DOMAINS.includes(domain);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+
+    // Validate email domain
+    if (!validateEmailDomain(email)) {
+      toast({
+        title: "Invalid email domain",
+        description: `Only email addresses from ${ALLOWED_DOMAINS.join(' and ')} are allowed.`,
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
 
     try {
       if (isLogin) {
@@ -97,8 +115,11 @@ const Auth = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                placeholder="Enter your email"
+                placeholder="Enter your @mopads.com or @360summits.com email"
               />
+              <p className="text-xs text-gray-500">
+                Only @mopads.com and @360summits.com email addresses are allowed
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
