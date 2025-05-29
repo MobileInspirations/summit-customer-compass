@@ -1,3 +1,4 @@
+
 import { fetchAllContacts, getContactsCount, clearExistingCategorizations, fetchCategories } from "./data/contactDataService";
 import { categorizeContact } from "./categorization/contactProcessor";
 import { ensureMainBucketsExist } from "./bucketCategorizationService";
@@ -110,7 +111,7 @@ export const categorizeContacts = async (
   console.log(`Contact categorization completed. Processed ${processedCount} contacts total.`);
 };
 
-// New function to fetch only uncategorized contacts
+// Improved function to fetch only uncategorized contacts using a more efficient query
 const fetchUncategorizedContacts = async (contactIds?: string[], limit: number = 5000) => {
   console.log(`Fetching uncategorized contacts with limit: ${limit}`);
   
@@ -137,47 +138,36 @@ const fetchUncategorizedContacts = async (contactIds?: string[], limit: number =
     return contacts || [];
   }
 
-  // First, get all categorized contact IDs
-  const { data: categorizedContactIds, error: categorizedError } = await supabase
-    .from('contact_categories')
-    .select('contact_id');
-  
-  if (categorizedError) {
-    console.error('Error fetching categorized contact IDs:', categorizedError);
-    throw categorizedError;
-  }
-
-  const categorizedIds = categorizedContactIds?.map(c => c.contact_id) || [];
-  console.log(`Found ${categorizedIds.length} already categorized contacts`);
-
-  // Now get uncategorized contacts with the specified limit
-  let contactsQuery = supabase
+  // Use a LEFT JOIN approach to find uncategorized contacts more efficiently
+  const { data: contacts, error } = await supabase
     .from('contacts')
     .select(`
       id, 
       email, 
       full_name, 
       company, 
-      summit_history
-    `);
-
-  // Exclude already categorized contacts
-  if (categorizedIds.length > 0) {
-    contactsQuery = contactsQuery.not('id', 'in', `(${categorizedIds.join(',')})`);
-  }
-
-  // Apply the limit
-  contactsQuery = contactsQuery.limit(limit);
-
-  const { data: contacts, error } = await contactsQuery;
+      summit_history,
+      contact_categories!left (contact_id)
+    `)
+    .is('contact_categories.contact_id', null)
+    .limit(limit);
 
   if (error) {
     console.error('Error fetching uncategorized contacts:', error);
     throw error;
   }
 
-  console.log(`Fetched ${contacts?.length || 0} uncategorized contacts (limit was ${limit})`);
-  return contacts || [];
+  // Transform the data to remove the join column
+  const uncategorizedContacts = contacts?.map(contact => ({
+    id: contact.id,
+    email: contact.email,
+    full_name: contact.full_name,
+    company: contact.company,
+    summit_history: contact.summit_history
+  })) || [];
+
+  console.log(`Fetched ${uncategorizedContacts.length} uncategorized contacts (limit was ${limit})`);
+  return uncategorizedContacts;
 };
 
 // Helper function to run categorization on newly uploaded contacts
