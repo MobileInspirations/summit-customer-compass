@@ -61,14 +61,29 @@ export const parseCSV = (csvText: string): CSVContact[] => {
     headers.forEach((header, index) => {
       const value = values[index]?.trim() || '';
       
-      // Updated header matching for your specific CSV format
+      // Enhanced header matching for various CSV formats
       if (header === 'email' || header.includes('email')) {
         contact.email = value;
-      } else if (header === 'first name' || header === 'name' || header.includes('first') || header.includes('name')) {
+      } else if (
+        header === 'first name' || 
+        header === 'name' || 
+        header.includes('first') || 
+        header.includes('name')
+      ) {
         contact.name = value;
-      } else if (header.includes('company') || header.includes('organization') || header.includes('business')) {
+      } else if (
+        header.includes('company') || 
+        header.includes('organization') || 
+        header.includes('business')
+      ) {
         contact.company = value;
-      } else if (header === 'contact tags' || header.includes('tags') || header.includes('summit') || header.includes('history')) {
+      } else if (
+        header === 'contact tags' || 
+        header === 'tags' ||
+        header.includes('tags') || 
+        header.includes('summit') || 
+        header.includes('history')
+      ) {
         // Handle contact tags which might be comma-separated
         if (value) {
           contact.summit_history = value.replace(/,/g, ';'); // Convert commas to semicolons for our format
