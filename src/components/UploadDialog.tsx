@@ -102,15 +102,18 @@ export const UploadDialog = ({ open, onOpenChange }: UploadDialogProps) => {
       headers.forEach((header, index) => {
         const value = values[index]?.trim() || '';
         
-        // More flexible header matching
-        if (header.includes('email') || header.includes('e-mail') || header.includes('mail')) {
+        // Updated header matching for your specific CSV format
+        if (header === 'email' || header.includes('email')) {
           contact.email = value;
-        } else if (header.includes('name') || header.includes('full_name') || header.includes('full name') || header.includes('first') || header.includes('last')) {
+        } else if (header === 'first name' || header === 'name' || header.includes('first') || header.includes('name')) {
           contact.name = value;
         } else if (header.includes('company') || header.includes('organization') || header.includes('business')) {
           contact.company = value;
-        } else if (header.includes('summit') || header.includes('history') || header.includes('event')) {
-          contact.summit_history = value;
+        } else if (header === 'contact tags' || header.includes('tags') || header.includes('summit') || header.includes('history')) {
+          // Handle contact tags which might be comma-separated
+          if (value) {
+            contact.summit_history = value.replace(/,/g, ';'); // Convert commas to semicolons for our format
+          }
         }
       });
 
@@ -145,7 +148,7 @@ export const UploadDialog = ({ open, onOpenChange }: UploadDialogProps) => {
       const contacts = parseCSV(text);
       
       if (contacts.length === 0) {
-        throw new Error("No valid contacts found in CSV file. Please ensure your CSV has an 'email' column with valid email addresses.");
+        throw new Error("No valid contacts found in CSV file. Please ensure your CSV has an 'Email' column with valid email addresses.");
       }
 
       setProgress(20);
@@ -229,7 +232,7 @@ export const UploadDialog = ({ open, onOpenChange }: UploadDialogProps) => {
           <Alert>
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              Ensure your CSV includes an 'email' column. Optional columns: name, company, summit_history.
+              Ensure your CSV includes an 'Email' column. Supported columns: First Name, Email, Contact Tags, Company.
             </AlertDescription>
           </Alert>
 
