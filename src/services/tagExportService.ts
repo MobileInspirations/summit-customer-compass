@@ -78,6 +78,14 @@ export const exportContactsByTag = async (categoryId: string) => {
     throw new Error("Failed to fetch contacts for category");
   }
 
+  if (!contactsInCategory || contactsInCategory.length === 0) {
+    console.log("No contacts found for this category");
+    return [];
+  }
+
+  // Get the category name from the first item
+  const categoryName = contactsInCategory[0].customer_categories.name;
+
   // Create CSV content for contacts in this category
   const csvHeaders = "Name,Email,Company,Created Date,Category\n";
   const csvRows = contactsInCategory.map(item => 
@@ -91,7 +99,7 @@ export const exportContactsByTag = async (categoryId: string) => {
   const link = document.createElement("a");
   const url = URL.createObjectURL(blob);
   link.setAttribute("href", url);
-  link.setAttribute("download", `contacts_${item.customer_categories.name}_${new Date().toISOString().split('T')[0]}.csv`);
+  link.setAttribute("download", `contacts_${categoryName}_${new Date().toISOString().split('T')[0]}.csv`);
   link.style.visibility = 'hidden';
   document.body.appendChild(link);
   link.click();
