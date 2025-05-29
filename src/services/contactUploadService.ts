@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 interface CSVContact {
@@ -14,12 +13,21 @@ export const uploadContacts = async (
 ): Promise<void> => {
   console.log(`Processing ${contacts.length} contacts...`);
 
+  // First, deduplicate contacts by email (keep the last occurrence)
+  const deduplicatedContacts = contacts.reduce((acc, contact) => {
+    acc[contact.email] = contact;
+    return acc;
+  }, {} as Record<string, CSVContact>);
+
+  const uniqueContacts = Object.values(deduplicatedContacts);
+  console.log(`After deduplication: ${uniqueContacts.length} unique contacts`);
+
   // Process contacts in batches
   const batchSize = 50;
   let processed = 0;
   
-  for (let i = 0; i < contacts.length; i += batchSize) {
-    const batch = contacts.slice(i, i + batchSize);
+  for (let i = 0; i < uniqueContacts.length; i += batchSize) {
+    const batch = uniqueContacts.slice(i, i + batchSize);
     
     // Prepare data for insertion
     const contactsToInsert = batch.map(contact => ({
@@ -45,6 +53,6 @@ export const uploadContacts = async (
     }
 
     processed += batch.length;
-    onProgress(20 + (processed / contacts.length) * 70);
+    onProgress(20 + (processed / uniqueContacts.length) * 70);
   }
 };
