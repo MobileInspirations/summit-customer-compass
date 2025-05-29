@@ -1,77 +1,22 @@
 
+import { fetchAllContacts, getContactsCount, clearExistingCategorizations, fetchCategories } from "./data/contactDataService";
+import { categorizeContact } from "./categorization/contactProcessor";
+import type { ContactForCategorization } from "./types/contactTypes";
 import { supabase } from "@/integrations/supabase/client";
-
-interface ContactForCategorization {
-  id: string;
-  email: string;
-  full_name?: string;
-  company?: string;
-  summit_history?: string[];
-}
 
 export const categorizeContacts = async (contactIds?: string[]): Promise<void> => {
   console.log('Starting contact categorization...');
 
   // Get all categories
-  const { data: categories, error: categoriesError } = await supabase
-    .from('customer_categories')
-    .select('*');
-
-  if (categoriesError) {
-    console.error('Error fetching categories:', categoriesError);
-    throw categoriesError;
-  }
-
+  const categories = await fetchCategories();
   console.log(`Found ${categories.length} categories`);
 
   // Get total contact count first
-  const { count: totalContacts, error: countError } = await supabase
-    .from('contacts')
-    .select('*', { count: 'exact', head: true });
-
-  if (countError) {
-    console.error('Error counting contacts:', countError);
-    throw countError;
-  }
-
+  const totalContacts = await getContactsCount();
   console.log(`Total contacts in database: ${totalContacts}`);
 
-  // Get contacts to categorize with pagination to handle large datasets
-  let allContacts: any[] = [];
-  let from = 0;
-  const batchSize = 1000; // Process in batches of 1000
-  
-  while (true) {
-    let contactsQuery = supabase
-      .from('contacts')
-      .select('id, email, full_name, company, summit_history')
-      .range(from, from + batchSize - 1);
-    
-    if (contactIds && contactIds.length > 0) {
-      contactsQuery = contactsQuery.in('id', contactIds);
-    }
-
-    const { data: contacts, error: contactsError } = await contactsQuery;
-
-    if (contactsError) {
-      console.error('Error fetching contacts:', contactsError);
-      throw contactsError;
-    }
-
-    if (!contacts || contacts.length === 0) {
-      break; // No more contacts to fetch
-    }
-
-    allContacts = allContacts.concat(contacts);
-    console.log(`Fetched batch: ${contacts.length} contacts (total so far: ${allContacts.length})`);
-
-    // If we got less than the batch size, we've reached the end
-    if (contacts.length < batchSize) {
-      break;
-    }
-
-    from += batchSize;
-  }
+  // Get contacts to categorize
+  const allContacts = await fetchAllContacts(contactIds);
 
   if (allContacts.length === 0) {
     console.log('No contacts to categorize');
@@ -82,15 +27,7 @@ export const categorizeContacts = async (contactIds?: string[]): Promise<void> =
 
   // Clear existing categorizations if we're doing a full categorization
   if (!contactIds || contactIds.length === 0) {
-    console.log('Clearing existing categorizations...');
-    const { error: clearError } = await supabase
-      .from('contact_categories')
-      .delete()
-      .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all records
-
-    if (clearError) {
-      console.warn('Warning: Could not clear existing categorizations:', clearError);
-    }
+    await clearExistingCategorizations();
   }
 
   // Process contacts in smaller batches to avoid overwhelming the database
@@ -111,160 +48,6 @@ export const categorizeContacts = async (contactIds?: string[]): Promise<void> =
   }
 
   console.log(`Contact categorization completed. Processed ${processedCount} contacts total.`);
-};
-
-const categorizeContact = async (
-  contact: ContactForCategorization, 
-  categories: any[]
-): Promise<void> => {
-  const assignedCategories: string[] = [];
-
-  for (const category of categories) {
-    if (shouldAssignToCategory(contact, category)) {
-      assignedCategories.push(category.id);
-    }
-  }
-
-  // Insert contact-category relationships
-  if (assignedCategories.length > 0) {
-    const contactCategoryRecords = assignedCategories.map(categoryId => ({
-      contact_id: contact.id,
-      category_id: categoryId
-    }));
-
-    const { error } = await supabase
-      .from('contact_categories')
-      .upsert(contactCategoryRecords, { 
-        onConflict: 'contact_id,category_id',
-        ignoreDuplicates: true 
-      });
-
-    if (error) {
-      console.error(`Error categorizing contact ${contact.email}:`, error);
-    } else {
-      console.log(`Assigned contact ${contact.email} to ${assignedCategories.length} categories`);
-    }
-  } else {
-    // Log contacts that don't match any categories for debugging
-    console.log(`No categories matched for contact: ${contact.email}`);
-  }
-};
-
-const shouldAssignToCategory = (contact: ContactForCategorization, category: any): boolean => {
-  const categoryName = category.name.toLowerCase();
-  const categoryDescription = category.description?.toLowerCase() || '';
-  const summitHistory = contact.summit_history || [];
-  const company = contact.company?.toLowerCase() || '';
-  const email = contact.email.toLowerCase();
-
-  // Customer type categorization
-  if (category.category_type === 'customer') {
-    // High-value customers
-    if (categoryName.includes('vip') || categoryName.includes('premium')) {
-      return summitHistory.some(event => 
-        event.toLowerCase().includes('vip') || 
-        event.toLowerCase().includes('premium') ||
-        event.toLowerCase().includes('platinum')
-      );
-    }
-
-    // Summit attendees
-    if (categoryName.includes('summit') || categoryName.includes('attendee')) {
-      return summitHistory.some(event => 
-        event.toLowerCase().includes('summit') ||
-        event.toLowerCase().includes('registration')
-      );
-    }
-
-    // Webinar participants
-    if (categoryName.includes('webinar') || categoryName.includes('training')) {
-      return summitHistory.some(event => 
-        event.toLowerCase().includes('webinar') ||
-        event.toLowerCase().includes('training') ||
-        event.toLowerCase().includes('masterclass')
-      );
-    }
-
-    // Buyers/customers
-    if (categoryName.includes('buyer') || categoryName.includes('customer')) {
-      return summitHistory.some(event => 
-        event.toLowerCase().includes('buyer') ||
-        event.toLowerCase().includes('purchase') ||
-        event.toLowerCase().includes('member')
-      );
-    }
-
-    // Subscribers - make this more inclusive
-    if (categoryName.includes('subscriber') || categoryName.includes('email') || categoryName.includes('list')) {
-      return summitHistory.some(event => 
-        event.toLowerCase().includes('subscriber') ||
-        event.toLowerCase().includes('email') ||
-        event.toLowerCase().includes('opt') ||
-        event.toLowerCase().includes('list')
-      ) || summitHistory.length === 0; // Include contacts with no history as potential subscribers
-    }
-
-    // Business/Enterprise
-    if (categoryName.includes('business') || categoryName.includes('enterprise')) {
-      return company !== '' || email.includes('@company') || email.includes('@corp');
-    }
-
-    // Based on specific topics
-    if (categoryName.includes('survival') || categoryName.includes('preparedness')) {
-      return summitHistory.some(event => 
-        event.toLowerCase().includes('survival') ||
-        event.toLowerCase().includes('preparedness') ||
-        event.toLowerCase().includes('emergency')
-      );
-    }
-
-    if (categoryName.includes('tax') || categoryName.includes('financial')) {
-      return summitHistory.some(event => 
-        event.toLowerCase().includes('tax') ||
-        event.toLowerCase().includes('financial') ||
-        event.toLowerCase().includes('investment')
-      );
-    }
-
-    if (categoryName.includes('health') || categoryName.includes('medical')) {
-      return summitHistory.some(event => 
-        event.toLowerCase().includes('health') ||
-        event.toLowerCase().includes('medical') ||
-        event.toLowerCase().includes('wellness')
-      );
-    }
-
-    // General subscriber catch-all - if no other categories match and it's a basic subscriber category
-    if (categoryName.includes('general') || categoryName.includes('basic') || categoryName === 'subscribers') {
-      return true; // All contacts can be general subscribers
-    }
-  }
-
-  // Personality type categorization
-  if (category.category_type === 'personality') {
-    // You can implement personality-based categorization here
-    // This could be based on engagement patterns, email domains, etc.
-    
-    // Example: Categorize based on email domain patterns
-    if (categoryName.includes('professional')) {
-      return !email.includes('gmail') && !email.includes('yahoo') && !email.includes('hotmail');
-    }
-
-    if (categoryName.includes('engaged')) {
-      return summitHistory.length >= 3; // Multiple engagements
-    }
-
-    if (categoryName.includes('new') || categoryName.includes('fresh')) {
-      return summitHistory.length <= 1; // New or low engagement
-    }
-
-    // Default personality assignment for broad categories
-    if (categoryName.includes('general') || categoryName.includes('standard')) {
-      return true;
-    }
-  }
-
-  return false;
 };
 
 // Helper function to run categorization on newly uploaded contacts
