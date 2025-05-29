@@ -44,8 +44,8 @@ export const runCategorizationWorkflow = async (
 
   console.log(`Total uncategorized contacts to categorize: ${allContacts.length}`);
 
-  // Process contacts in smaller batches to avoid overwhelming the database
-  const processingBatchSize = 50;
+  // Process contacts in batches of 5,000 to improve performance
+  const processingBatchSize = 5000;
   const totalBatches = Math.ceil(allContacts.length / processingBatchSize);
   let processedCount = 0;
 

@@ -58,9 +58,8 @@ export const runEnhancedCategorizationWorkflow = async (
 
   console.log(`Total uncategorized contacts to categorize: ${allContacts.length}`);
 
-  // Process contacts in smaller batches to avoid overwhelming the database
-  // Use smaller batches when using AI to respect rate limits
-  const processingBatchSize = useAI ? 10 : 50;
+  // Process contacts in larger batches - 5,000 for regular categorization, 1,000 for AI to respect rate limits
+  const processingBatchSize = useAI ? 1000 : 5000;
   const totalBatches = Math.ceil(allContacts.length / processingBatchSize);
   let processedCount = 0;
 

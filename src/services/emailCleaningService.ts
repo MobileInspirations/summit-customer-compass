@@ -54,7 +54,7 @@ export const validateEmailsBatch = async (
   console.log(`Starting email validation for ${emails.length} emails`);
   
   const validEmails: string[] = [];
-  const batchSize = 50; // Process emails in batches to avoid overwhelming the API
+  const batchSize = 5000; // Process emails in batches of 5,000 to improve performance
   
   for (let i = 0; i < emails.length; i += batchSize) {
     const batch = emails.slice(i, i + batchSize);

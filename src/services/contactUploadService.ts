@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { categorizeNewContacts } from "./contactCategorizationService";
 import { ensureMainBucketsExist, assignContactsToBucket, type MainBucketId } from "./bucketCategorizationService";
@@ -28,8 +29,8 @@ export const uploadContacts = async (
   const uniqueContacts = Object.values(deduplicatedContacts);
   console.log(`After deduplication: ${uniqueContacts.length} unique contacts`);
 
-  // Process contacts in batches
-  const batchSize = 50;
+  // Process contacts in batches of 5,000
+  const batchSize = 5000;
   let processed = 0;
   const uploadedEmails: string[] = [];
   
