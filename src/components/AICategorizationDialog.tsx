@@ -22,15 +22,28 @@ export const AICategorizationDialog = ({ open, onOpenChange, onCategorize }: AIC
 
     setIsSubmitting(true);
     try {
+      // Close the dialog immediately when starting
+      onOpenChange(false);
       await onCategorize(apiKey.trim());
+    } catch (error) {
+      console.error('AI categorization error:', error);
+      // Reopen dialog if there was an error
+      onOpenChange(true);
     } finally {
       setIsSubmitting(false);
-      setApiKey("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");
     }
   };
 
+  // Reset submitting state when dialog opens/closes
+  const handleOpenChange = (newOpen: boolean) => {
+    if (!newOpen) {
+      setIsSubmitting(false);
+    }
+    onOpenChange(newOpen);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -75,7 +88,7 @@ export const AICategorizationDialog = ({ open, onOpenChange, onCategorize }: AIC
             <Button
               type="button"
               variant="outline"
-              onClick={() => onOpenChange(false)}
+              onClick={() => handleOpenChange(false)}
               disabled={isSubmitting}
             >
               Cancel
