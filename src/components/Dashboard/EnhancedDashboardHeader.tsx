@@ -1,6 +1,13 @@
 
 import { Button } from "@/components/ui/button";
-import { Upload, Users, ArrowUpDown, Download, Brain, Tags, LogOut } from "lucide-react";
+import { Upload, Users, ArrowUpDown, Download, Brain, Tags, LogOut, MoreHorizontal } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface EnhancedDashboardHeaderProps {
   onUploadClick: () => void;
@@ -42,7 +49,8 @@ export const EnhancedDashboardHeader = ({
             </p>
           </div>
           
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-3">
+            {/* Primary Actions */}
             <Button onClick={onUploadClick} className="bg-blue-600 hover:bg-blue-700">
               <Upload className="w-4 h-4 mr-2" />
               Upload CSV
@@ -50,60 +58,74 @@ export const EnhancedDashboardHeader = ({
             
             <Button onClick={onViewAllContacts} variant="outline">
               <Users className="w-4 h-4 mr-2" />
-              View All Contacts
+              View Contacts
             </Button>
             
-            <Button 
-              onClick={onSortContacts} 
-              variant="outline"
-              disabled={isSorting}
-            >
-              <ArrowUpDown className="w-4 h-4 mr-2" />
-              {isSorting ? "Sorting..." : "Sort Contacts"}
-            </Button>
-            
-            <Button 
-              onClick={onExportAllTags} 
-              variant="outline"
-              disabled={isExporting}
-            >
-              <Tags className="w-4 h-4 mr-2" />
-              {isExporting ? "Exporting..." : "Export All Tags"}
-            </Button>
-            
-            <Button 
-              onClick={onCategorizeAll} 
-              variant="outline"
-              disabled={isCategorizing}
-              className="bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
-            >
-              <Tags className="w-4 h-4 mr-2" />
-              {isCategorizing ? "Categorizing..." : "Categorize All"}
-            </Button>
+            {/* Categorization Actions */}
+            <div className="flex items-center space-x-2 border-l pl-3">
+              <Button 
+                onClick={onCategorizeAll} 
+                variant="outline"
+                disabled={isCategorizing}
+                className="bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
+              >
+                <Tags className="w-4 h-4 mr-2" />
+                {isCategorizing ? "Categorizing..." : "Auto Categorize"}
+              </Button>
 
-            <Button 
-              onClick={onAICategorizeAll} 
-              variant="outline"
-              disabled={isCategorizing}
-              className="bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200"
-            >
-              <Brain className="w-4 h-4 mr-2" />
-              {isCategorizing ? "AI Processing..." : "AI Categorize"}
-            </Button>
+              <Button 
+                onClick={onAICategorizeAll} 
+                variant="outline"
+                disabled={isCategorizing}
+                className="bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200"
+              >
+                <Brain className="w-4 h-4 mr-2" />
+                {isCategorizing ? "AI Processing..." : "AI Categorize"}
+              </Button>
+            </div>
             
-            <Button 
-              onClick={onExport} 
-              variant="outline"
-              disabled={selectedCategoriesCount === 0}
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Export Selected ({selectedCategoriesCount})
-            </Button>
+            {/* Export Actions */}
+            <div className="flex items-center space-x-2 border-l pl-3">
+              <Button 
+                onClick={onExport} 
+                variant="outline"
+                disabled={selectedCategoriesCount === 0}
+                className="bg-orange-50 hover:bg-orange-100 text-orange-700 border-orange-200"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Export Selected ({selectedCategoriesCount})
+              </Button>
+            </div>
             
-            <Button onClick={onSignOut} variant="ghost">
-              <LogOut className="w-4 h-4 mr-2" />
-              Sign Out
-            </Button>
+            {/* More Actions Menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon">
+                  <MoreHorizontal className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 bg-white">
+                <DropdownMenuItem 
+                  onClick={onSortContacts}
+                  disabled={isSorting}
+                >
+                  <ArrowUpDown className="w-4 h-4 mr-2" />
+                  {isSorting ? "Sorting..." : "Sort Contacts"}
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={onExportAllTags}
+                  disabled={isExporting}
+                >
+                  <Tags className="w-4 h-4 mr-2" />
+                  {isExporting ? "Exporting..." : "Export All Tags"}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={onSignOut}>
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Sign Out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>
