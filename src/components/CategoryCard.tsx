@@ -3,14 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-interface Category {
-  id: number;
-  name: string;
-  count: number;
-  description: string;
-  color: string;
-}
+import type { Category } from "@/hooks/useCategories";
 
 interface CategoryCardProps {
   category: Category;

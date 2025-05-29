@@ -13,14 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-
-interface Category {
-  id: number;
-  name: string;
-  count: number;
-  description: string;
-  color: string;
-}
+import type { Category } from "@/hooks/useCategories";
 
 interface ExportDialogProps {
   open: boolean;

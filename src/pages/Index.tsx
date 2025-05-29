@@ -9,46 +9,25 @@ import { useAuth } from "@/hooks/useAuth";
 import { CategoryCard } from "@/components/CategoryCard";
 import { UploadDialog } from "@/components/UploadDialog";
 import { ExportDialog } from "@/components/ExportDialog";
-
-// Current customer categories - this will be replaced with Supabase data
-const customerCategories = [
-  { id: 1, name: "VIP Attendees", count: 15420, description: "High-value summit participants", color: "bg-purple-500" },
-  { id: 2, name: "Multi-Event Participants", count: 23680, description: "Attended 3+ summits", color: "bg-blue-500" },
-  { id: 3, name: "Recent Registrants", count: 18290, description: "Registered in last 6 months", color: "bg-green-500" },
-  { id: 4, name: "Industry Leaders", count: 8750, description: "C-level executives", color: "bg-orange-500" },
-  { id: 5, name: "Tech Enthusiasts", count: 32150, description: "Technology-focused events", color: "bg-cyan-500" },
-  { id: 6, name: "Healthcare Professionals", count: 19820, description: "Healthcare summit attendees", color: "bg-red-500" },
-  { id: 7, name: "Financial Services", count: 14560, description: "Finance industry participants", color: "bg-emerald-500" },
-  { id: 8, name: "Marketing Professionals", count: 28930, description: "Marketing summit attendees", color: "bg-pink-500" },
-  { id: 9, name: "Inactive Contacts", count: 45670, description: "No activity in 12+ months", color: "bg-gray-500" },
-  { id: 10, name: "New Prospects", count: 12340, description: "Never attended events", color: "bg-yellow-500" },
-];
-
-// Predefined business categories
-const businessCategories = [
-  { id: 11, name: "Holistic Wellness & Natural Living", count: 42350, description: "Natural health and wellness enthusiasts", color: "bg-emerald-600" },
-  { id: 12, name: "Targeted Health Solutions & Disease Management", count: 38920, description: "Disease-specific health solutions", color: "bg-red-600" },
-  { id: 13, name: "Fitness, Nutrition & Weight Management", count: 35480, description: "Fitness and nutrition focused", color: "bg-orange-600" },
-  { id: 14, name: "Mental & Emotional Well-being", count: 29760, description: "Mental health and emotional wellness", color: "bg-purple-600" },
-  { id: 15, name: "Women's Health & Community", count: 41200, description: "Women-focused health topics", color: "bg-pink-600" },
-  { id: 16, name: "Longevity & Regenerative Health", count: 27890, description: "Anti-aging and regenerative medicine", color: "bg-cyan-600" },
-  { id: 17, name: "Digital Marketing & Content Creation Skills", count: 33670, description: "Marketing and content creation", color: "bg-blue-600" },
-  { id: 18, name: "Entrepreneurship & Business Development", count: 31540, description: "Business growth and entrepreneurship", color: "bg-indigo-600" },
-  { id: 19, name: "Investing, Finance & Wealth Creation", count: 28430, description: "Financial education and investing", color: "bg-green-600" },
-  { id: 20, name: "Self-Reliance & Preparedness", count: 24780, description: "Self-sufficiency and preparedness", color: "bg-yellow-600" },
-];
+import { useCategoriesByType } from "@/hooks/useCategories";
+import { useContactsCount } from "@/hooks/useContacts";
 
 const Index = () => {
-  const [selectedCategories, setSelectedCategories] = useState<number[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
   const { toast } = useToast();
   const { user, signOut } = useAuth();
 
-  const allCategories = [...customerCategories, ...businessCategories];
-  const totalContacts = allCategories.reduce((sum, cat) => sum + cat.count, 0);
+  // Fetch data from Supabase
+  const { data: customerCategories = [], isLoading: customerLoading } = useCategoriesByType("customer");
+  const { data: personalityCategories = [], isLoading: personalityLoading } = useCategoriesByType("personality");
+  const { data: totalContacts = 0, isLoading: contactsLoading } = useContactsCount();
 
-  const handleCategorySelect = (categoryId: number) => {
+  const allCategories = [...customerCategories, ...personalityCategories];
+  const isLoading = customerLoading || personalityLoading || contactsLoading;
+
+  const handleCategorySelect = (categoryId: string) => {
     setSelectedCategories(prev => 
       prev.includes(categoryId) 
         ? prev.filter(id => id !== categoryId)
@@ -79,6 +58,17 @@ const Index = () => {
   const selectedCount = allCategories
     .filter(cat => selectedCategories.includes(cat.id))
     .reduce((sum, cat) => sum + cat.count, 0);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading customer data...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -192,11 +182,11 @@ const Index = () => {
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-gray-900">Personality Type Buckets</h2>
             <Badge variant="outline" className="text-sm">
-              {businessCategories.filter(cat => selectedCategories.includes(cat.id)).length} of {businessCategories.length} selected
+              {personalityCategories.filter(cat => selectedCategories.includes(cat.id)).length} of {personalityCategories.length} selected
             </Badge>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-            {businessCategories.map((category) => (
+            {personalityCategories.map((category) => (
               <CategoryCard
                 key={category.id}
                 category={category}
@@ -244,7 +234,7 @@ const Index = () => {
         onOpenChange={setShowExportDialog}
         selectedCategories={selectedCategories.map(id => 
           allCategories.find(cat => cat.id === id)!
-        )}
+        ).filter(Boolean)}
       />
     </div>
   );
