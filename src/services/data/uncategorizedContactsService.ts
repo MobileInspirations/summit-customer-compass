@@ -1,8 +1,8 @@
 
 import { supabase } from "@/integrations/supabase/client";
 
-export const fetchUncategorizedContacts = async (contactIds?: string[], limit: number = 5000) => {
-  console.log(`Fetching uncategorized contacts with limit: ${limit}`);
+export const fetchUncategorizedContacts = async (contactIds?: string[], limit?: number) => {
+  console.log(`Fetching uncategorized contacts${limit ? ` with limit: ${limit}` : ' (no limit)'}`);
   
   // If specific contact IDs are provided, filter by them
   if (contactIds && contactIds.length > 0) {
@@ -15,8 +15,7 @@ export const fetchUncategorizedContacts = async (contactIds?: string[], limit: n
         company, 
         summit_history
       `)
-      .in('id', contactIds)
-      .limit(limit);
+      .in('id', contactIds);
 
     if (error) {
       console.error('Error fetching specific contacts:', error);
@@ -28,7 +27,7 @@ export const fetchUncategorizedContacts = async (contactIds?: string[], limit: n
   }
 
   // Use a LEFT JOIN approach to find uncategorized contacts more efficiently
-  const { data: contacts, error } = await supabase
+  let query = supabase
     .from('contacts')
     .select(`
       id, 
@@ -38,8 +37,14 @@ export const fetchUncategorizedContacts = async (contactIds?: string[], limit: n
       summit_history,
       contact_categories!left (contact_id)
     `)
-    .is('contact_categories.contact_id', null)
-    .limit(limit);
+    .is('contact_categories.contact_id', null);
+
+  // Only apply limit if specified
+  if (limit) {
+    query = query.limit(limit);
+  }
+
+  const { data: contacts, error } = await query;
 
   if (error) {
     console.error('Error fetching uncategorized contacts:', error);
@@ -55,6 +60,6 @@ export const fetchUncategorizedContacts = async (contactIds?: string[], limit: n
     summit_history: contact.summit_history
   })) || [];
 
-  console.log(`Fetched ${uncategorizedContacts.length} uncategorized contacts (limit was ${limit})`);
+  console.log(`Fetched ${uncategorizedContacts.length} uncategorized contacts${limit ? ` (limit was ${limit})` : ' (no limit)'}`);
   return uncategorizedContacts;
 };
