@@ -22,15 +22,20 @@ export const categorizeContacts = async (
   const categories = await fetchCategories();
   console.log(`Found ${categories.length} categories`);
 
-  // Get total contact count first
-  const totalContacts = await getContactsCount();
-  console.log(`Total contacts in database: ${totalContacts}`);
-
   // Get contacts to categorize
   const allContacts = await fetchAllContacts(contactIds);
 
   if (allContacts.length === 0) {
     console.log('No contacts to categorize');
+    if (onProgress) {
+      onProgress({
+        progress: 100,
+        currentBatch: 0,
+        totalBatches: 0,
+        processedCount: 0,
+        totalCount: 0
+      });
+    }
     return;
   }
 
@@ -46,20 +51,22 @@ export const categorizeContacts = async (
   const totalBatches = Math.ceil(allContacts.length / processingBatchSize);
   let processedCount = 0;
 
+  // Initial progress update
+  if (onProgress) {
+    onProgress({
+      progress: 0,
+      currentBatch: 1,
+      totalBatches,
+      processedCount: 0,
+      totalCount: allContacts.length
+    });
+  }
+
   for (let i = 0; i < allContacts.length; i += processingBatchSize) {
     const batch = allContacts.slice(i, i + processingBatchSize);
     const currentBatch = Math.floor(i / processingBatchSize) + 1;
     
-    // Update progress
-    if (onProgress) {
-      onProgress({
-        progress: (processedCount / allContacts.length) * 100,
-        currentBatch,
-        totalBatches,
-        processedCount,
-        totalCount: allContacts.length
-      });
-    }
+    console.log(`Processing batch ${currentBatch}/${totalBatches} with ${batch.length} contacts`);
     
     const categorizationPromises = batch.map(contact => 
       categorizeContact(contact as ContactForCategorization, categories)
@@ -70,16 +77,19 @@ export const categorizeContacts = async (
     
     console.log(`Processed ${processedCount}/${allContacts.length} contacts`);
 
-    // Final progress update
+    // Update progress after each batch
     if (onProgress) {
       onProgress({
-        progress: (processedCount / allContacts.length) * 100,
+        progress: Math.round((processedCount / allContacts.length) * 100),
         currentBatch,
         totalBatches,
         processedCount,
         totalCount: allContacts.length
       });
     }
+
+    // Small delay to allow UI updates
+    await new Promise(resolve => setTimeout(resolve, 100));
   }
 
   console.log(`Contact categorization completed. Processed ${processedCount} contacts total.`);
