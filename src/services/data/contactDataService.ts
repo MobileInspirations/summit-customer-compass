@@ -5,7 +5,7 @@ export const fetchAllContacts = async (contactIds?: string[]) => {
   // Get contacts to categorize with pagination to handle large datasets
   let allContacts: any[] = [];
   let from = 0;
-  const batchSize = 1000; // Process in batches of 1000
+  const batchSize = 5000; // Increased from 1000 to 5000
   
   while (true) {
     let contactsQuery = supabase
