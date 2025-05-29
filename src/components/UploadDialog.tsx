@@ -47,35 +47,86 @@ export const UploadDialog = ({ open, onOpenChange }: UploadDialogProps) => {
     }
   };
 
-  const parseCSV = (csvText: string): CSVContact[] => {
-    const lines = csvText.split('\n').filter(line => line.trim());
-    if (lines.length < 2) return [];
+  const parseCSVLine = (line: string): string[] => {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      
+      if (char === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          // Handle escaped quotes
+          current += '"';
+          i++; // Skip next quote
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === ',' && !inQuotes) {
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    
+    result.push(current.trim());
+    return result;
+  };
 
-    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+  const parseCSV = (csvText: string): CSVContact[] => {
+    console.log('Starting CSV parsing...');
+    
+    // Split by lines and filter out empty lines
+    const lines = csvText.split(/\r?\n/).filter(line => line.trim());
+    console.log(`Found ${lines.length} lines in CSV`);
+    
+    if (lines.length < 2) {
+      console.log('CSV has less than 2 lines');
+      return [];
+    }
+
+    // Parse header row
+    const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().trim());
+    console.log('Headers found:', headers);
+    
     const contacts: CSVContact[] = [];
 
     for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
+      const values = parseCSVLine(lines[i]);
+      console.log(`Row ${i}:`, values);
+      
       const contact: CSVContact = { email: '' };
 
       headers.forEach((header, index) => {
-        const value = values[index] || '';
-        if (header.includes('email')) {
+        const value = values[index]?.trim() || '';
+        
+        // More flexible header matching
+        if (header.includes('email') || header.includes('e-mail') || header.includes('mail')) {
           contact.email = value;
-        } else if (header.includes('name') || header.includes('full_name')) {
+        } else if (header.includes('name') || header.includes('full_name') || header.includes('full name') || header.includes('first') || header.includes('last')) {
           contact.name = value;
-        } else if (header.includes('company')) {
+        } else if (header.includes('company') || header.includes('organization') || header.includes('business')) {
           contact.company = value;
-        } else if (header.includes('summit') || header.includes('history')) {
+        } else if (header.includes('summit') || header.includes('history') || header.includes('event')) {
           contact.summit_history = value;
         }
       });
 
-      if (contact.email && contact.email.includes('@')) {
+      console.log(`Parsed contact:`, contact);
+
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (contact.email && emailRegex.test(contact.email)) {
         contacts.push(contact);
+        console.log(`Valid contact added: ${contact.email}`);
+      } else {
+        console.log(`Skipping invalid contact - email: "${contact.email}"`);
       }
     }
 
+    console.log(`Total valid contacts found: ${contacts.length}`);
     return contacts;
   };
 
@@ -86,15 +137,19 @@ export const UploadDialog = ({ open, onOpenChange }: UploadDialogProps) => {
     setProgress(0);
 
     try {
-      // Read file content
+      console.log('Reading file...');
       const text = await file.text();
+      console.log('File content length:', text.length);
+      console.log('First 200 characters:', text.substring(0, 200));
+      
       const contacts = parseCSV(text);
       
       if (contacts.length === 0) {
-        throw new Error("No valid contacts found in CSV file");
+        throw new Error("No valid contacts found in CSV file. Please ensure your CSV has an 'email' column with valid email addresses.");
       }
 
       setProgress(20);
+      console.log(`Processing ${contacts.length} contacts...`);
 
       // Process contacts in batches
       const batchSize = 50;
@@ -110,6 +165,8 @@ export const UploadDialog = ({ open, onOpenChange }: UploadDialogProps) => {
           company: contact.company || null,
           summit_history: contact.summit_history ? contact.summit_history.split(';').filter(Boolean) : []
         }));
+
+        console.log(`Inserting batch ${Math.floor(i / batchSize) + 1}:`, contactsToInsert);
 
         // Insert batch with upsert to handle duplicates
         const { error } = await supabase
@@ -172,7 +229,7 @@ export const UploadDialog = ({ open, onOpenChange }: UploadDialogProps) => {
           <Alert>
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              Ensure your CSV includes columns: email, name, company, and summit_history.
+              Ensure your CSV includes an 'email' column. Optional columns: name, company, summit_history.
             </AlertDescription>
           </Alert>
 
