@@ -4,7 +4,18 @@ import { categorizeContact } from "./categorization/contactProcessor";
 import type { ContactForCategorization } from "./types/contactTypes";
 import { supabase } from "@/integrations/supabase/client";
 
-export const categorizeContacts = async (contactIds?: string[]): Promise<void> => {
+export interface CategorizationProgress {
+  progress: number;
+  currentBatch: number;
+  totalBatches: number;
+  processedCount: number;
+  totalCount: number;
+}
+
+export const categorizeContacts = async (
+  contactIds?: string[], 
+  onProgress?: (progress: CategorizationProgress) => void
+): Promise<void> => {
   console.log('Starting contact categorization...');
 
   // Get all categories
@@ -32,10 +43,23 @@ export const categorizeContacts = async (contactIds?: string[]): Promise<void> =
 
   // Process contacts in smaller batches to avoid overwhelming the database
   const processingBatchSize = 50;
+  const totalBatches = Math.ceil(allContacts.length / processingBatchSize);
   let processedCount = 0;
 
   for (let i = 0; i < allContacts.length; i += processingBatchSize) {
     const batch = allContacts.slice(i, i + processingBatchSize);
+    const currentBatch = Math.floor(i / processingBatchSize) + 1;
+    
+    // Update progress
+    if (onProgress) {
+      onProgress({
+        progress: (processedCount / allContacts.length) * 100,
+        currentBatch,
+        totalBatches,
+        processedCount,
+        totalCount: allContacts.length
+      });
+    }
     
     const categorizationPromises = batch.map(contact => 
       categorizeContact(contact as ContactForCategorization, categories)
@@ -45,6 +69,17 @@ export const categorizeContacts = async (contactIds?: string[]): Promise<void> =
     processedCount += batch.length;
     
     console.log(`Processed ${processedCount}/${allContacts.length} contacts`);
+
+    // Final progress update
+    if (onProgress) {
+      onProgress({
+        progress: (processedCount / allContacts.length) * 100,
+        currentBatch,
+        totalBatches,
+        processedCount,
+        totalCount: allContacts.length
+      });
+    }
   }
 
   console.log(`Contact categorization completed. Processed ${processedCount} contacts total.`);

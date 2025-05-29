@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
@@ -15,6 +14,7 @@ import { CategoriesSection } from "@/components/Dashboard/CategoriesSection";
 import { QuickActions } from "@/components/Dashboard/QuickActions";
 import { UploadDialog } from "@/components/UploadDialog";
 import { ExportDialog } from "@/components/ExportDialog";
+import { CategorizationProgress } from "@/components/CategorizationProgress";
 
 const Index = () => {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
@@ -23,6 +23,13 @@ const Index = () => {
   const [isCategorizing, setIsCategorizing] = useState(false);
   const [isSorting, setIsSorting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [categorizationProgress, setCategorizationProgress] = useState({
+    progress: 0,
+    currentBatch: 0,
+    totalBatches: 0,
+    processedCount: 0,
+    totalCount: 0
+  });
   const { toast } = useToast();
   const { signOut } = useAuth();
   const navigate = useNavigate();
@@ -58,8 +65,18 @@ const Index = () => {
 
   const handleCategorizeAll = async () => {
     setIsCategorizing(true);
+    setCategorizationProgress({
+      progress: 0,
+      currentBatch: 0,
+      totalBatches: 0,
+      processedCount: 0,
+      totalCount: 0
+    });
+
     try {
-      await categorizeContacts();
+      await categorizeContacts(undefined, (progress) => {
+        setCategorizationProgress(progress);
+      });
       queryClient.invalidateQueries({ queryKey: ["categories"] });
       toast({
         title: "Categorization complete",
@@ -74,6 +91,15 @@ const Index = () => {
       });
     } finally {
       setIsCategorizing(false);
+      setTimeout(() => {
+        setCategorizationProgress({
+          progress: 0,
+          currentBatch: 0,
+          totalBatches: 0,
+          processedCount: 0,
+          totalCount: 0
+        });
+      }, 2000);
     }
   };
 
@@ -196,6 +222,14 @@ const Index = () => {
         selectedCategories={selectedCategories.map(id => 
           allCategories.find(cat => cat.id === id)!
         ).filter(Boolean)}
+      />
+      <CategorizationProgress
+        isVisible={isCategorizing}
+        progress={categorizationProgress.progress}
+        currentBatch={categorizationProgress.currentBatch}
+        totalBatches={categorizationProgress.totalBatches}
+        processedCount={categorizationProgress.processedCount}
+        totalCount={categorizationProgress.totalCount}
       />
     </div>
   );
