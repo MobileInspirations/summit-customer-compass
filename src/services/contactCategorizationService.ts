@@ -33,11 +33,11 @@ export const categorizeContacts = async (
     });
   }
 
-  // Get contacts to categorize
-  const allContacts = await fetchAllContacts(contactIds);
+  // Get contacts that haven't been categorized yet (limit to 5000)
+  const allContacts = await fetchUncategorizedContacts(contactIds, 5000);
 
   if (allContacts.length === 0) {
-    console.log('No contacts to categorize');
+    console.log('No uncategorized contacts to process');
     if (onProgress) {
       onProgress({
         progress: 100,
@@ -50,12 +50,7 @@ export const categorizeContacts = async (
     return;
   }
 
-  console.log(`Total contacts to categorize: ${allContacts.length}`);
-
-  // Clear existing categorizations if we're doing a full categorization
-  if (!contactIds || contactIds.length === 0) {
-    await clearExistingCategorizations();
-  }
+  console.log(`Total uncategorized contacts to categorize: ${allContacts.length}`);
 
   // Process contacts in smaller batches to avoid overwhelming the database
   const processingBatchSize = 50;
@@ -110,6 +105,44 @@ export const categorizeContacts = async (
   }
 
   console.log(`Contact categorization completed. Processed ${processedCount} contacts total.`);
+};
+
+// New function to fetch only uncategorized contacts
+const fetchUncategorizedContacts = async (contactIds?: string[], limit: number = 5000) => {
+  let contactsQuery = supabase
+    .from('contacts')
+    .select(`
+      id, 
+      email, 
+      full_name, 
+      company, 
+      summit_history
+    `)
+    .limit(limit);
+
+  // If specific contact IDs are provided, filter by them
+  if (contactIds && contactIds.length > 0) {
+    contactsQuery = contactsQuery.in('id', contactIds);
+  } else {
+    // Only get contacts that haven't been categorized yet
+    const { data: categorizedContactIds } = await supabase
+      .from('contact_categories')
+      .select('contact_id');
+    
+    if (categorizedContactIds && categorizedContactIds.length > 0) {
+      const categorizedIds = categorizedContactIds.map(c => c.contact_id);
+      contactsQuery = contactsQuery.not('id', 'in', `(${categorizedIds.join(',')})`);
+    }
+  }
+
+  const { data: contacts, error } = await contactsQuery;
+
+  if (error) {
+    console.error('Error fetching uncategorized contacts:', error);
+    throw error;
+  }
+
+  return contacts || [];
 };
 
 // Helper function to run categorization on newly uploaded contacts
