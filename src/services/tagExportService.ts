@@ -4,24 +4,45 @@ import { supabase } from "@/integrations/supabase/client";
 export const exportAllTags = async () => {
   console.log("Exporting all tags from all contacts summit_history");
   
-  // Get ALL contacts with their summit_history tags (including null ones)
-  // Remove the default 1000 limit by using .range() with a large number
-  const { data: contacts, error: contactsError } = await supabase
-    .from("contacts")
-    .select("id, email, full_name, company, summit_history")
-    .range(0, 999999); // This will fetch up to 1 million contacts
+  // Get ALL contacts by fetching in batches to avoid Supabase limits
+  let allContacts: any[] = [];
+  let from = 0;
+  const batchSize = 1000;
+  let hasMore = true;
 
-  if (contactsError) {
-    console.error("Error fetching contacts:", contactsError);
-    throw new Error("Failed to fetch contacts");
+  while (hasMore) {
+    console.log(`Fetching contacts ${from} to ${from + batchSize - 1}`);
+    
+    const { data: contactBatch, error: contactsError } = await supabase
+      .from("contacts")
+      .select("id, email, full_name, company, summit_history")
+      .range(from, from + batchSize - 1);
+
+    if (contactsError) {
+      console.error("Error fetching contacts:", contactsError);
+      throw new Error("Failed to fetch contacts");
+    }
+
+    if (!contactBatch || contactBatch.length === 0) {
+      hasMore = false;
+    } else {
+      allContacts = [...allContacts, ...contactBatch];
+      
+      // If we got less than the batch size, we've reached the end
+      if (contactBatch.length < batchSize) {
+        hasMore = false;
+      } else {
+        from += batchSize;
+      }
+    }
   }
 
-  if (!contacts || contacts.length === 0) {
+  console.log(`Processing ${allContacts.length} total contacts`);
+
+  if (allContacts.length === 0) {
     console.log("No contacts found");
     return [];
   }
-
-  console.log(`Processing ${contacts.length} total contacts`);
 
   // Extract all unique tags from summit_history arrays
   const allTags = new Set<string>();
@@ -29,7 +50,7 @@ export const exportAllTags = async () => {
   let contactsWithTags = 0;
   let totalTagOccurrences = 0;
 
-  contacts.forEach(contact => {
+  allContacts.forEach(contact => {
     if (contact.summit_history && Array.isArray(contact.summit_history)) {
       contactsWithTags++;
       contact.summit_history.forEach(tag => {
@@ -43,7 +64,7 @@ export const exportAllTags = async () => {
     }
   });
 
-  console.log(`Found ${contactsWithTags} contacts with tags out of ${contacts.length} total contacts`);
+  console.log(`Found ${contactsWithTags} contacts with tags out of ${allContacts.length} total contacts`);
   console.log(`Total tag occurrences: ${totalTagOccurrences}`);
   console.log(`Unique tags: ${allTags.size}`);
 
@@ -60,7 +81,7 @@ export const exportAllTags = async () => {
   ).join("\n");
   
   // Add summary row at the top
-  const summaryRow = `"SUMMARY: ${sortedTags.length} unique tags, ${totalTagOccurrences} total occurrences across ${contactsWithTags} contacts out of ${contacts.length} total contacts","","Summary"\n`;
+  const summaryRow = `"SUMMARY: ${sortedTags.length} unique tags, ${totalTagOccurrences} total occurrences across ${contactsWithTags} contacts out of ${allContacts.length} total contacts","","Summary"\n`;
   
   const csvContent = csvHeaders + summaryRow + csvRows;
   
@@ -75,7 +96,7 @@ export const exportAllTags = async () => {
   link.click();
   document.body.removeChild(link);
   
-  console.log(`Exported ${sortedTags.length} unique tags from ${contactsWithTags} contacts with tags (out of ${contacts.length} total contacts)`);
+  console.log(`Exported ${sortedTags.length} unique tags from ${contactsWithTags} contacts with tags (out of ${allContacts.length} total contacts)`);
   return sortedTags;
 };
 
