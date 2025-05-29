@@ -28,6 +28,12 @@ const buckets = [
     name: 'Survivalist',
     description: 'Emergency preparedness and survival contacts',
     color: 'bg-orange-500'
+  },
+  {
+    id: 'cannot-place',
+    name: 'Cannot Place',
+    description: 'Contacts that do not match any specific category',
+    color: 'bg-gray-500'
   }
 ];
 

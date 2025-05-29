@@ -20,6 +20,12 @@ export const MAIN_BUCKETS = {
     name: 'Survivalist',
     description: 'Emergency preparedness and survival contacts',
     category_type: 'customer'
+  },
+  'cannot-place': {
+    id: 'cannot-place',
+    name: 'Cannot Place',
+    description: 'Contacts that do not match any specific category',
+    category_type: 'customer'
   }
 } as const;
 
@@ -122,6 +128,8 @@ const getBucketColor = (bucketId: MainBucketId): string => {
       return 'bg-green-500';
     case 'survivalist':
       return 'bg-orange-500';
+    case 'cannot-place':
+      return 'bg-gray-500';
     default:
       return 'bg-gray-500';
   }

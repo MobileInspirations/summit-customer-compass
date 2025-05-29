@@ -15,6 +15,17 @@ export const categorizeContact = async (
     }
   }
 
+  // If no categories matched, assign to "Cannot Place" category
+  if (assignedCategories.length === 0) {
+    const cannotPlaceCategory = categories.find(cat => cat.name === 'Cannot Place');
+    if (cannotPlaceCategory) {
+      assignedCategories.push(cannotPlaceCategory.id);
+      console.log(`Assigned contact ${contact.email} to "Cannot Place" category`);
+    } else {
+      console.log(`No categories matched for contact: ${contact.email} and no "Cannot Place" category found`);
+    }
+  }
+
   // Insert contact-category relationships
   if (assignedCategories.length > 0) {
     const contactCategoryRecords = assignedCategories.map(categoryId => ({
@@ -35,7 +46,7 @@ export const categorizeContact = async (
       console.log(`Assigned contact ${contact.email} to ${assignedCategories.length} categories`);
     }
   } else {
-    // Log contacts that don't match any categories for debugging
+    // This should rarely happen now since we have the "Cannot Place" fallback
     console.log(`No categories matched for contact: ${contact.email}`);
   }
 };

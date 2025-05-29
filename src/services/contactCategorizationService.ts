@@ -1,6 +1,6 @@
-
 import { fetchAllContacts, getContactsCount, clearExistingCategorizations, fetchCategories } from "./data/contactDataService";
 import { categorizeContact } from "./categorization/contactProcessor";
+import { ensureMainBucketsExist } from "./bucketCategorizationService";
 import type { ContactForCategorization } from "./types/contactTypes";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -17,6 +17,9 @@ export const categorizeContacts = async (
   onProgress?: (progress: CategorizationProgress) => void
 ): Promise<void> => {
   console.log('Starting contact categorization...');
+
+  // Ensure main buckets exist (including "Cannot Place")
+  await ensureMainBucketsExist();
 
   // Get all categories
   const categories = await fetchCategories();
