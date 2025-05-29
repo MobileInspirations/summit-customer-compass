@@ -1,4 +1,3 @@
-
 import OpenAI from 'openai';
 
 const PERSONALITY_BUCKETS = {
@@ -14,22 +13,19 @@ const PERSONALITY_BUCKETS = {
   "Women's Health & Community": "Topics specific to women's physiological and psychological health, empowerment, and community building for women."
 };
 
-// Initialize OpenAI client (will need API key from Supabase secrets)
-let openaiClient: OpenAI | null = null;
+// Initialize OpenAI client for browser use
+let openaiApiKey: string | null = null;
 
 export const initializeOpenAI = (apiKey: string) => {
-  openaiClient = new OpenAI({
-    apiKey: apiKey,
-    dangerouslyAllowBrowser: false // This should run server-side
-  });
+  openaiApiKey = apiKey;
 };
 
 export const categorizeContactWithAI = async (
   contactTags: string[],
   summitHistory: string[] = []
 ): Promise<string> => {
-  if (!openaiClient) {
-    throw new Error('OpenAI client not initialized');
+  if (!openaiApiKey) {
+    throw new Error('OpenAI API key not provided');
   }
 
   if (!contactTags.length && !summitHistory.length) {
@@ -63,23 +59,35 @@ Instructions:
 Bucket:`;
 
   try {
-    const response = await openaiClient.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: "You are a precise categorization system. Always respond with exactly one of the provided bucket names."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      max_tokens: 100,
-      temperature: 0.1 // Low temperature for consistent results
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openaiApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: "You are a precise categorization system. Always respond with exactly one of the provided bucket names."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        max_tokens: 100,
+        temperature: 0.1
+      })
     });
 
-    const bucketName = response.choices[0]?.message?.content?.trim();
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    const bucketName = data.choices[0]?.message?.content?.trim();
     
     // Validate the response is one of our buckets
     if (bucketName && Object.keys(PERSONALITY_BUCKETS).includes(bucketName)) {

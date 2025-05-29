@@ -9,7 +9,7 @@ import { categorizeContacts } from "@/services/contactCategorizationService";
 import { sortContacts } from "@/services/contactSortingService";
 import { exportAllTags } from "@/services/tagExportService";
 import { useAuth } from "@/hooks/useAuth";
-import { DashboardHeader } from "@/components/Dashboard/DashboardHeader";
+import { EnhancedDashboardHeader } from "@/components/Dashboard/EnhancedDashboardHeader";
 import { StatsCards } from "@/components/Dashboard/StatsCards";
 import { CategoriesSection } from "@/components/Dashboard/CategoriesSection";
 import { BucketSelector } from "@/components/BucketSelector";
@@ -17,6 +17,7 @@ import { UploadDialog } from "@/components/UploadDialog";
 import { ExportDialog } from "@/components/ExportDialog";
 import { CategorizationProgress } from "@/components/CategorizationProgress";
 import { ExportProgress } from "@/components/ExportProgress";
+import { AICategorizationDialog } from "@/components/AICategorizationDialog";
 import type { MainBucketId } from "@/services/bucketCategorizationService";
 
 const Index = () => {
@@ -24,6 +25,7 @@ const Index = () => {
   const [selectedBucket, setSelectedBucket] = useState<MainBucketId>('biz-op');
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
+  const [showAIDialog, setShowAIDialog] = useState(false);
   const [isCategorizing, setIsCategorizing] = useState(false);
   const [isSorting, setIsSorting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -103,6 +105,47 @@ const Index = () => {
       });
     } finally {
       setIsCategorizing(false);
+      setTimeout(() => {
+        setCategorizationProgress({
+          progress: 0,
+          currentBatch: 0,
+          totalBatches: 0,
+          processedCount: 0,
+          totalCount: 0
+        });
+      }, 2000);
+    }
+  };
+
+  const handleAICategorizeAll = async (apiKey: string) => {
+    setIsCategorizing(true);
+    setCategorizationProgress({
+      progress: 0,
+      currentBatch: 0,
+      totalBatches: 0,
+      processedCount: 0,
+      totalCount: 0
+    });
+
+    try {
+      await categorizeContacts(undefined, (progress) => {
+        setCategorizationProgress(progress);
+      }, true, apiKey);
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+      toast({
+        title: "AI Categorization complete",
+        description: "All contacts have been categorized using AI into personality type buckets.",
+      });
+    } catch (error) {
+      console.error('AI Categorization error:', error);
+      toast({
+        title: "AI Categorization failed",
+        description: "Please check your API key and try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCategorizing(false);
+      setShowAIDialog(false);
       setTimeout(() => {
         setCategorizationProgress({
           progress: 0,
@@ -222,12 +265,13 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <DashboardHeader
+      <EnhancedDashboardHeader
         onUploadClick={() => setShowUploadDialog(true)}
         onViewAllContacts={handleViewAllContacts}
         onSortContacts={handleSortContacts}
         onExportAllTags={handleExportAllTags}
         onCategorizeAll={handleCategorizeAll}
+        onAICategorizeAll={() => setShowAIDialog(true)}
         onExport={handleExport}
         onSignOut={handleSignOut}
         selectedCategoriesCount={selectedCategories.length}
@@ -274,6 +318,11 @@ const Index = () => {
         selectedCategories={selectedCategories.map(id => 
           allCategories.find(cat => cat.id === id)!
         ).filter(Boolean)}
+      />
+      <AICategorizationDialog
+        open={showAIDialog}
+        onOpenChange={setShowAIDialog}
+        onCategorize={handleAICategorizeAll}
       />
       <CategorizationProgress
         isVisible={isCategorizing}
