@@ -19,6 +19,7 @@ import { CategorizationProgress } from "@/components/CategorizationProgress";
 import { ExportProgress } from "@/components/ExportProgress";
 import { AICategorizationDialog } from "@/components/AICategorizationDialog";
 import type { MainBucketId } from "@/services/bucketCategorizationService";
+import { EmailCleaningProgress } from "@/components/EmailCleaningProgress";
 
 const Index = () => {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
@@ -40,6 +41,14 @@ const Index = () => {
     contactsProcessed: 0,
     totalContacts: 0,
     tagsFound: 0,
+    isComplete: false,
+    isError: false
+  });
+  const [emailCleaningProgress, setEmailCleaningProgress] = useState({
+    processed: 0,
+    total: 0,
+    validEmails: 0,
+    isActive: false,
     isComplete: false,
     isError: false
   });
@@ -252,16 +261,16 @@ const Index = () => {
     .filter(cat => selectedCategories.includes(cat.id))
     .reduce((sum, cat) => sum + cat.count, 0);
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading customer data...</p>
-        </div>
-      </div>
-    );
-  }
+  const handleEmailCleaningProgress = (processed: number, total: number, validEmails: number) => {
+    setEmailCleaningProgress({
+      processed,
+      total,
+      validEmails,
+      isActive: true,
+      isComplete: false,
+      isError: false
+    });
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -318,6 +327,7 @@ const Index = () => {
         selectedCategories={selectedCategories.map(id => 
           allCategories.find(cat => cat.id === id)!
         ).filter(Boolean)}
+        onEmailCleaningProgress={handleEmailCleaningProgress}
       />
       <AICategorizationDialog
         open={showAIDialog}
@@ -339,6 +349,14 @@ const Index = () => {
         contactsProcessed={exportProgress.contactsProcessed}
         totalContacts={exportProgress.totalContacts}
         tagsFound={exportProgress.tagsFound}
+      />
+      <EmailCleaningProgress
+        isVisible={emailCleaningProgress.isActive}
+        isComplete={emailCleaningProgress.isComplete}
+        isError={emailCleaningProgress.isError}
+        processed={emailCleaningProgress.processed}
+        total={emailCleaningProgress.total}
+        validEmails={emailCleaningProgress.validEmails}
       />
     </div>
   );

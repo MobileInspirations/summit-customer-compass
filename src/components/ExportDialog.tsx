@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { Download, FileText, AlertTriangle } from "lucide-react";
+import { Download, FileText, AlertTriangle, Mail } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -12,18 +12,27 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { exportContactsByCategory } from "@/services/exportService";
+import { validateEmailsBatch } from "@/services/emailCleaningService";
 import type { Category } from "@/hooks/useCategories";
 
 interface ExportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   selectedCategories: Category[];
+  onEmailCleaningProgress?: (processed: number, total: number, validEmails: number) => void;
 }
 
-export const ExportDialog = ({ open, onOpenChange, selectedCategories }: ExportDialogProps) => {
+export const ExportDialog = ({ 
+  open, 
+  onOpenChange, 
+  selectedCategories,
+  onEmailCleaningProgress 
+}: ExportDialogProps) => {
   const [exporting, setExporting] = useState(false);
+  const [cleanEmails, setCleanEmails] = useState(false);
   const { toast } = useToast();
 
   const totalContacts = selectedCategories.reduce((sum, cat) => sum + cat.count, 0);
@@ -37,13 +46,19 @@ export const ExportDialog = ({ open, onOpenChange, selectedCategories }: ExportD
       let totalFilesGenerated = 0;
       
       for (const category of selectedCategories) {
-        const filesForCategory = await exportContactsByCategory(category.id, category.name, category.count);
+        const filesForCategory = await exportContactsByCategory(
+          category.id, 
+          category.name, 
+          category.count,
+          cleanEmails,
+          onEmailCleaningProgress
+        );
         totalFilesGenerated += filesForCategory;
       }
       
       toast({
         title: "Export completed",
-        description: `Successfully generated ${totalFilesGenerated} CSV file(s) with ${totalContacts.toLocaleString()} contacts.`,
+        description: `Successfully generated ${totalFilesGenerated} CSV file(s) with ${totalContacts.toLocaleString()} contacts${cleanEmails ? ' (emails cleaned)' : ''}.`,
       });
       
       onOpenChange(false);
@@ -83,6 +98,27 @@ export const ExportDialog = ({ open, onOpenChange, selectedCategories }: ExportD
               <Badge className="bg-green-100 text-green-800">
                 {totalFiles}
               </Badge>
+            </div>
+          </div>
+
+          {/* Email Cleaning Option */}
+          <div className="bg-blue-50 rounded-lg p-4">
+            <div className="flex items-start space-x-3">
+              <Checkbox
+                id="cleanEmails"
+                checked={cleanEmails}
+                onCheckedChange={(checked) => setCleanEmails(checked as boolean)}
+                className="mt-1"
+              />
+              <div className="space-y-2">
+                <label htmlFor="cleanEmails" className="text-sm font-medium cursor-pointer flex items-center gap-2">
+                  <Mail className="w-4 h-4 text-blue-600" />
+                  Clean email addresses before export
+                </label>
+                <p className="text-xs text-blue-700">
+                  Uses TrueList.io to validate and remove invalid email addresses. This may take longer but improves data quality.
+                </p>
+              </div>
             </div>
           </div>
 
