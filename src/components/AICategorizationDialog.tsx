@@ -13,7 +13,7 @@ interface AICategorizationDialogProps {
 }
 
 export const AICategorizationDialog = ({ open, onOpenChange, onCategorize }: AICategorizationDialogProps) => {
-  const [apiKey, setApiKey] = useState("");
+  const [apiKey, setApiKey] = useState("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");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -25,7 +25,7 @@ export const AICategorizationDialog = ({ open, onOpenChange, onCategorize }: AIC
       await onCategorize(apiKey.trim());
     } finally {
       setIsSubmitting(false);
-      setApiKey("");
+      setApiKey("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");
     }
   };
 
