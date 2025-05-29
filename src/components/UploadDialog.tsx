@@ -12,10 +12,19 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface UploadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+}
+
+interface CSVContact {
+  email: string;
+  name?: string;
+  company?: string;
+  summit_history?: string;
 }
 
 export const UploadDialog = ({ open, onOpenChange }: UploadDialogProps) => {
@@ -23,6 +32,7 @@ export const UploadDialog = ({ open, onOpenChange }: UploadDialogProps) => {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
@@ -37,31 +47,96 @@ export const UploadDialog = ({ open, onOpenChange }: UploadDialogProps) => {
     }
   };
 
+  const parseCSV = (csvText: string): CSVContact[] => {
+    const lines = csvText.split('\n').filter(line => line.trim());
+    if (lines.length < 2) return [];
+
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+    const contacts: CSVContact[] = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
+      const contact: CSVContact = { email: '' };
+
+      headers.forEach((header, index) => {
+        const value = values[index] || '';
+        if (header.includes('email')) {
+          contact.email = value;
+        } else if (header.includes('name') || header.includes('full_name')) {
+          contact.name = value;
+        } else if (header.includes('company')) {
+          contact.company = value;
+        } else if (header.includes('summit') || header.includes('history')) {
+          contact.summit_history = value;
+        }
+      });
+
+      if (contact.email && contact.email.includes('@')) {
+        contacts.push(contact);
+      }
+    }
+
+    return contacts;
+  };
+
   const handleUpload = async () => {
     if (!file) return;
 
     setUploading(true);
     setProgress(0);
 
-    // Simulate upload progress
-    const interval = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 90) {
-          clearInterval(interval);
-          return prev;
-        }
-        return prev + 10;
-      });
-    }, 200);
-
     try {
-      // TODO: Implement actual Supabase upload logic
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Read file content
+      const text = await file.text();
+      const contacts = parseCSV(text);
       
+      if (contacts.length === 0) {
+        throw new Error("No valid contacts found in CSV file");
+      }
+
+      setProgress(20);
+
+      // Process contacts in batches
+      const batchSize = 50;
+      let processed = 0;
+      
+      for (let i = 0; i < contacts.length; i += batchSize) {
+        const batch = contacts.slice(i, i + batchSize);
+        
+        // Prepare data for insertion
+        const contactsToInsert = batch.map(contact => ({
+          email: contact.email,
+          full_name: contact.name || null,
+          company: contact.company || null,
+          summit_history: contact.summit_history ? contact.summit_history.split(';').filter(Boolean) : []
+        }));
+
+        // Insert batch with upsert to handle duplicates
+        const { error } = await supabase
+          .from('contacts')
+          .upsert(contactsToInsert, { 
+            onConflict: 'email',
+            ignoreDuplicates: false 
+          });
+
+        if (error) {
+          console.error('Error inserting batch:', error);
+          throw error;
+        }
+
+        processed += batch.length;
+        setProgress(20 + (processed / contacts.length) * 70);
+      }
+
       setProgress(100);
+      
+      // Invalidate queries to refresh the UI
+      queryClient.invalidateQueries({ queryKey: ["contacts"] });
+      queryClient.invalidateQueries({ queryKey: ["contacts-count"] });
+      
       toast({
         title: "Upload successful",
-        description: `${file.name} has been processed and categorized.`,
+        description: `${contacts.length} contacts have been processed and added to the database.`,
       });
       
       setTimeout(() => {
@@ -70,10 +145,12 @@ export const UploadDialog = ({ open, onOpenChange }: UploadDialogProps) => {
         setUploading(false);
         setProgress(0);
       }, 1000);
+
     } catch (error) {
+      console.error('Upload error:', error);
       toast({
         title: "Upload failed",
-        description: "Please try again or contact support.",
+        description: error instanceof Error ? error.message : "Please try again or contact support.",
         variant: "destructive",
       });
       setUploading(false);
