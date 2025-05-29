@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Upload, Download, Users, Database, Filter, LogOut, Tags, ArrowUpDown, FileSpreadsheet } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,8 @@ import { ExportDialog } from "@/components/ExportDialog";
 import { useCategoriesByType } from "@/hooks/useCategories";
 import { useContactsCount } from "@/hooks/useContacts";
 import { categorizeContacts } from "@/services/contactCategorizationService";
+import { sortContacts } from "@/services/contactSortingService";
+import { exportAllTags } from "@/services/tagExportService";
 import { useQueryClient } from "@tanstack/react-query";
 
 const Index = () => {
@@ -18,6 +21,8 @@ const Index = () => {
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [isCategorizing, setIsCategorizing] = useState(false);
+  const [isSorting, setIsSorting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const { toast } = useToast();
   const { user, signOut } = useAuth();
   const queryClient = useQueryClient();
@@ -74,20 +79,50 @@ const Index = () => {
     }
   };
 
-  const handleSortContacts = () => {
-    // Placeholder function for sorting contacts
-    toast({
-      title: "Sort Contacts",
-      description: "Contact sorting functionality will be implemented here.",
-    });
+  const handleSortContacts = async () => {
+    setIsSorting(true);
+    try {
+      await sortContacts('name', 'asc'); // Sort by name in ascending order
+      
+      // Refresh the contacts data
+      queryClient.invalidateQueries({ queryKey: ["contacts"] });
+      queryClient.invalidateQueries({ queryKey: ["contacts-count"] });
+      
+      toast({
+        title: "Contacts sorted",
+        description: "All contacts have been sorted alphabetically by name.",
+      });
+    } catch (error) {
+      console.error('Sorting error:', error);
+      toast({
+        title: "Sorting failed",
+        description: "Please try again or contact support.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSorting(false);
+    }
   };
 
-  const handleExportAllTags = () => {
-    // Placeholder function for exporting all tags
-    toast({
-      title: "Export All Tags",
-      description: "Tag export functionality will be implemented here.",
-    });
+  const handleExportAllTags = async () => {
+    setIsExporting(true);
+    try {
+      const exportedCategories = await exportAllTags();
+      
+      toast({
+        title: "Export complete",
+        description: `Successfully exported ${exportedCategories.length} categories/tags to CSV file.`,
+      });
+    } catch (error) {
+      console.error('Export error:', error);
+      toast({
+        title: "Export failed",
+        description: "Please try again or contact support.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const handleSignOut = async () => {
@@ -137,16 +172,18 @@ const Index = () => {
               <Button 
                 onClick={handleSortContacts}
                 variant="outline"
+                disabled={isSorting}
               >
                 <ArrowUpDown className="w-4 h-4 mr-2" />
-                Sort Contacts
+                {isSorting ? "Sorting..." : "Sort Contacts"}
               </Button>
               <Button 
                 onClick={handleExportAllTags}
                 variant="outline"
+                disabled={isExporting}
               >
                 <FileSpreadsheet className="w-4 h-4 mr-2" />
-                Export All Tags
+                {isExporting ? "Exporting..." : "Export All Tags"}
               </Button>
               <Button 
                 onClick={handleCategorizeAll}
