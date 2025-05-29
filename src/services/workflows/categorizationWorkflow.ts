@@ -33,8 +33,8 @@ export const runCategorizationWorkflow = async (
     if (onProgress) {
       onProgress({
         progress: 100,
-        currentBatch: 0,
-        totalBatches: 0,
+        currentBatch: 1,
+        totalBatches: 1,
         processedCount: 0,
         totalCount: 0
       });
@@ -55,7 +55,7 @@ export const runCategorizationWorkflow = async (
   }
 
   // Small delay to ensure the initial progress is shown
-  await new Promise(resolve => setTimeout(resolve, 200));
+  await new Promise(resolve => setTimeout(resolve, 100));
 
   for (let i = 0; i < allContacts.length; i += processingBatchSize) {
     const batch = allContacts.slice(i, i + processingBatchSize);
@@ -63,25 +63,41 @@ export const runCategorizationWorkflow = async (
     
     console.log(`Processing batch ${currentBatch}/${totalBatches} with ${batch.length} contacts`);
     
-    const categorizationPromises = batch.map(contact => 
-      categorizeContact(contact as ContactForCategorization, categories)
-    );
-
-    await Promise.all(categorizationPromises);
-    processedCount += batch.length;
-    
-    console.log(`Processed ${processedCount}/${allContacts.length} contacts`);
-
-    // Update progress after each batch with a small delay
-    if (onProgress) {
-      const progressUpdate = createProgressUpdate(processedCount, allContacts.length, currentBatch, totalBatches);
-      console.log(`Updating progress: ${progressUpdate.progress}% - Batch ${currentBatch}/${totalBatches}`);
-      
-      onProgress(progressUpdate);
+    // Process each contact individually to track progress better
+    for (let j = 0; j < batch.length; j++) {
+      const contact = batch[j];
+      try {
+        await categorizeContact(contact as ContactForCategorization, categories);
+        processedCount++;
+        
+        // Update progress more frequently (every 100 contacts or end of batch)
+        if (processedCount % 100 === 0 || j === batch.length - 1) {
+          if (onProgress) {
+            const progressUpdate = createProgressUpdate(processedCount, allContacts.length, currentBatch, totalBatches);
+            console.log(`Progress update: ${progressUpdate.progress}% - Processed ${processedCount}/${allContacts.length} contacts`);
+            onProgress(progressUpdate);
+          }
+          // Small delay to allow UI updates
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+      } catch (error) {
+        console.error(`Error categorizing contact ${contact.email}:`, error);
+        processedCount++; // Still count as processed to maintain progress
+      }
     }
+    
+    console.log(`Completed batch ${currentBatch}/${totalBatches}. Processed ${processedCount}/${allContacts.length} contacts`);
 
-    // Delay to allow UI updates and prevent overwhelming the UI
-    await new Promise(resolve => setTimeout(resolve, 200));
+    // Delay between batches to prevent overwhelming the system
+    if (currentBatch < totalBatches) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+  }
+
+  // Final progress update
+  if (onProgress) {
+    const finalProgress = createProgressUpdate(processedCount, allContacts.length, totalBatches, totalBatches);
+    onProgress(finalProgress);
   }
 
   console.log(`Contact categorization completed. Processed ${processedCount} contacts total.`);
