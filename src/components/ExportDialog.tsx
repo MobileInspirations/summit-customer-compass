@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import { exportContactsByCategory } from "@/services/exportService";
 import type { Category } from "@/hooks/useCategories";
 
 interface ExportDialogProps {
@@ -26,23 +27,28 @@ export const ExportDialog = ({ open, onOpenChange, selectedCategories }: ExportD
   const { toast } = useToast();
 
   const totalContacts = selectedCategories.reduce((sum, cat) => sum + cat.count, 0);
-  const totalFiles = Math.ceil(totalContacts / 25000);
+  const totalFiles = selectedCategories.reduce((sum, cat) => sum + Math.ceil(cat.count / 25000), 0);
   const largeCategories = selectedCategories.filter(cat => cat.count > 25000);
 
   const handleExport = async () => {
     setExporting(true);
 
     try {
-      // TODO: Implement actual Supabase export logic
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      let totalFilesGenerated = 0;
+      
+      for (const category of selectedCategories) {
+        const filesForCategory = await exportContactsByCategory(category.id, category.name, category.count);
+        totalFilesGenerated += filesForCategory;
+      }
       
       toast({
-        title: "Export started",
-        description: `Generating ${totalFiles} CSV file(s) with ${totalContacts.toLocaleString()} contacts.`,
+        title: "Export completed",
+        description: `Successfully generated ${totalFilesGenerated} CSV file(s) with ${totalContacts.toLocaleString()} contacts.`,
       });
       
       onOpenChange(false);
     } catch (error) {
+      console.error("Export error:", error);
       toast({
         title: "Export failed",
         description: "Please try again or contact support.",
@@ -130,7 +136,7 @@ export const ExportDialog = ({ open, onOpenChange, selectedCategories }: ExportD
               className="bg-green-600 hover:bg-green-700"
             >
               <Download className="w-4 h-4 mr-2" />
-              {exporting ? "Preparing..." : "Export CSV Files"}
+              {exporting ? "Exporting..." : "Export CSV Files"}
             </Button>
           </div>
         </div>
