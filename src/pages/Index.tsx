@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { Upload, Download, Users, Database, Filter, LogOut } from "lucide-react";
+import { Upload, Download, Users, Database, Filter, LogOut, Tags } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,13 +11,17 @@ import { UploadDialog } from "@/components/UploadDialog";
 import { ExportDialog } from "@/components/ExportDialog";
 import { useCategoriesByType } from "@/hooks/useCategories";
 import { useContactsCount } from "@/hooks/useContacts";
+import { categorizeContacts } from "@/services/contactCategorizationService";
+import { useQueryClient } from "@tanstack/react-query";
 
 const Index = () => {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
+  const [isCategorizing, setIsCategorizing] = useState(false);
   const { toast } = useToast();
   const { user, signOut } = useAuth();
+  const queryClient = useQueryClient();
 
   // Fetch data from Supabase
   const { data: customerCategories = [], isLoading: customerLoading } = useCategoriesByType("customer");
@@ -45,6 +49,30 @@ const Index = () => {
       return;
     }
     setShowExportDialog(true);
+  };
+
+  const handleCategorizeAll = async () => {
+    setIsCategorizing(true);
+    try {
+      await categorizeContacts(); // Categorize all contacts
+      
+      // Refresh the category counts
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+      
+      toast({
+        title: "Categorization complete",
+        description: "All contacts have been automatically categorized into appropriate buckets.",
+      });
+    } catch (error) {
+      console.error('Categorization error:', error);
+      toast({
+        title: "Categorization failed",
+        description: "Please try again or contact support.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCategorizing(false);
+    }
   };
 
   const handleSignOut = async () => {
@@ -90,6 +118,14 @@ const Index = () => {
               >
                 <Upload className="w-4 h-4 mr-2" />
                 Upload Data
+              </Button>
+              <Button 
+                onClick={handleCategorizeAll}
+                variant="outline"
+                disabled={isCategorizing}
+              >
+                <Tags className="w-4 h-4 mr-2" />
+                {isCategorizing ? "Categorizing..." : "Categorize All"}
               </Button>
               <Button 
                 onClick={handleExport}

@@ -1,4 +1,6 @@
+
 import { supabase } from "@/integrations/supabase/client";
+import { categorizeNewContacts } from "./contactCategorizationService";
 
 interface CSVContact {
   email: string;
@@ -25,6 +27,7 @@ export const uploadContacts = async (
   // Process contacts in batches
   const batchSize = 50;
   let processed = 0;
+  const uploadedEmails: string[] = [];
   
   for (let i = 0; i < uniqueContacts.length; i += batchSize) {
     const batch = uniqueContacts.slice(i, i + batchSize);
@@ -52,7 +55,24 @@ export const uploadContacts = async (
       throw error;
     }
 
+    // Track uploaded emails for categorization
+    uploadedEmails.push(...batch.map(c => c.email));
+
     processed += batch.length;
-    onProgress(20 + (processed / uniqueContacts.length) * 70);
+    onProgress(20 + (processed / uniqueContacts.length) * 60); // Leave 20% for categorization
   }
+
+  console.log('Starting automatic categorization...');
+  onProgress(80);
+
+  try {
+    // Automatically categorize the uploaded contacts
+    await categorizeNewContacts(uploadedEmails);
+    console.log('Automatic categorization completed');
+  } catch (error) {
+    console.error('Error during categorization:', error);
+    // Don't fail the entire upload if categorization fails
+  }
+
+  onProgress(100);
 };
