@@ -1,11 +1,11 @@
-
 import { useState } from "react";
-import { Upload, Download, Users, Database, Filter, LogOut, Tags, ArrowUpDown, FileSpreadsheet } from "lucide-react";
+import { Upload, Download, Users, Database, Filter, LogOut, Tags, ArrowUpDown, FileSpreadsheet, Table } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
 import { CategoryCard } from "@/components/CategoryCard";
 import { UploadDialog } from "@/components/UploadDialog";
 import { ExportDialog } from "@/components/ExportDialog";
@@ -25,6 +25,7 @@ const Index = () => {
   const [isExporting, setIsExporting] = useState(false);
   const { toast } = useToast();
   const { user, signOut } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   // Fetch data from Supabase
@@ -137,6 +138,10 @@ const Index = () => {
     .filter(cat => selectedCategories.includes(cat.id))
     .reduce((sum, cat) => sum + cat.count, 0);
 
+  const handleViewAllContacts = () => {
+    navigate("/contacts");
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -168,6 +173,13 @@ const Index = () => {
               >
                 <Upload className="w-4 h-4 mr-2" />
                 Upload Data
+              </Button>
+              <Button 
+                onClick={handleViewAllContacts}
+                variant="outline"
+              >
+                <Table className="w-4 h-4 mr-2" />
+                View All Contacts
               </Button>
               <Button 
                 onClick={handleSortContacts}
