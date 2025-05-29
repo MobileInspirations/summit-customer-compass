@@ -109,6 +109,45 @@ export const categorizeContacts = async (
 
 // New function to fetch only uncategorized contacts
 const fetchUncategorizedContacts = async (contactIds?: string[], limit: number = 5000) => {
+  console.log(`Fetching uncategorized contacts with limit: ${limit}`);
+  
+  // If specific contact IDs are provided, filter by them
+  if (contactIds && contactIds.length > 0) {
+    const { data: contacts, error } = await supabase
+      .from('contacts')
+      .select(`
+        id, 
+        email, 
+        full_name, 
+        company, 
+        summit_history
+      `)
+      .in('id', contactIds)
+      .limit(limit);
+
+    if (error) {
+      console.error('Error fetching specific contacts:', error);
+      throw error;
+    }
+
+    console.log(`Found ${contacts?.length || 0} specific contacts`);
+    return contacts || [];
+  }
+
+  // First, get all categorized contact IDs
+  const { data: categorizedContactIds, error: categorizedError } = await supabase
+    .from('contact_categories')
+    .select('contact_id');
+  
+  if (categorizedError) {
+    console.error('Error fetching categorized contact IDs:', categorizedError);
+    throw categorizedError;
+  }
+
+  const categorizedIds = categorizedContactIds?.map(c => c.contact_id) || [];
+  console.log(`Found ${categorizedIds.length} already categorized contacts`);
+
+  // Now get uncategorized contacts with the specified limit
   let contactsQuery = supabase
     .from('contacts')
     .select(`
@@ -117,23 +156,15 @@ const fetchUncategorizedContacts = async (contactIds?: string[], limit: number =
       full_name, 
       company, 
       summit_history
-    `)
-    .limit(limit);
+    `);
 
-  // If specific contact IDs are provided, filter by them
-  if (contactIds && contactIds.length > 0) {
-    contactsQuery = contactsQuery.in('id', contactIds);
-  } else {
-    // Only get contacts that haven't been categorized yet
-    const { data: categorizedContactIds } = await supabase
-      .from('contact_categories')
-      .select('contact_id');
-    
-    if (categorizedContactIds && categorizedContactIds.length > 0) {
-      const categorizedIds = categorizedContactIds.map(c => c.contact_id);
-      contactsQuery = contactsQuery.not('id', 'in', `(${categorizedIds.join(',')})`);
-    }
+  // Exclude already categorized contacts
+  if (categorizedIds.length > 0) {
+    contactsQuery = contactsQuery.not('id', 'in', `(${categorizedIds.join(',')})`);
   }
+
+  // Apply the limit
+  contactsQuery = contactsQuery.limit(limit);
 
   const { data: contacts, error } = await contactsQuery;
 
@@ -142,6 +173,7 @@ const fetchUncategorizedContacts = async (contactIds?: string[], limit: number =
     throw error;
   }
 
+  console.log(`Fetched ${contacts?.length || 0} uncategorized contacts (limit was ${limit})`);
   return contacts || [];
 };
 
