@@ -22,6 +22,17 @@ export const categorizeContacts = async (
   const categories = await fetchCategories();
   console.log(`Found ${categories.length} categories`);
 
+  // Show initial loading state
+  if (onProgress) {
+    onProgress({
+      progress: 0,
+      currentBatch: 0,
+      totalBatches: 0,
+      processedCount: 0,
+      totalCount: 0
+    });
+  }
+
   // Get contacts to categorize
   const allContacts = await fetchAllContacts(contactIds);
 
@@ -51,7 +62,7 @@ export const categorizeContacts = async (
   const totalBatches = Math.ceil(allContacts.length / processingBatchSize);
   let processedCount = 0;
 
-  // Initial progress update
+  // Initial progress update with actual numbers
   if (onProgress) {
     onProgress({
       progress: 0,
@@ -61,6 +72,9 @@ export const categorizeContacts = async (
       totalCount: allContacts.length
     });
   }
+
+  // Small delay to ensure the initial progress is shown
+  await new Promise(resolve => setTimeout(resolve, 200));
 
   for (let i = 0; i < allContacts.length; i += processingBatchSize) {
     const batch = allContacts.slice(i, i + processingBatchSize);
@@ -77,10 +91,13 @@ export const categorizeContacts = async (
     
     console.log(`Processed ${processedCount}/${allContacts.length} contacts`);
 
-    // Update progress after each batch
+    // Update progress after each batch with a small delay
     if (onProgress) {
+      const progress = Math.round((processedCount / allContacts.length) * 100);
+      console.log(`Updating progress: ${progress}% - Batch ${currentBatch}/${totalBatches}`);
+      
       onProgress({
-        progress: Math.round((processedCount / allContacts.length) * 100),
+        progress,
         currentBatch,
         totalBatches,
         processedCount,
@@ -88,8 +105,8 @@ export const categorizeContacts = async (
       });
     }
 
-    // Small delay to allow UI updates
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // Delay to allow UI updates and prevent overwhelming the UI
+    await new Promise(resolve => setTimeout(resolve, 200));
   }
 
   console.log(`Contact categorization completed. Processed ${processedCount} contacts total.`);
