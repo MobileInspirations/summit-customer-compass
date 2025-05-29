@@ -1,11 +1,11 @@
+
 import { useState } from "react";
-import { Upload, Download, Users, Database, Filter } from "lucide-react";
+import { Upload, Download, Users, Database, Filter, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { CategoryCard } from "@/components/CategoryCard";
 import { UploadDialog } from "@/components/UploadDialog";
 import { ExportDialog } from "@/components/ExportDialog";
@@ -43,6 +43,7 @@ const Index = () => {
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
   const { toast } = useToast();
+  const { user, signOut } = useAuth();
 
   const allCategories = [...customerCategories, ...businessCategories];
   const totalContacts = allCategories.reduce((sum, cat) => sum + cat.count, 0);
@@ -67,6 +68,14 @@ const Index = () => {
     setShowExportDialog(true);
   };
 
+  const handleSignOut = async () => {
+    await signOut();
+    toast({
+      title: "Signed out",
+      description: "You have been successfully signed out.",
+    });
+  };
+
   const selectedCount = allCategories
     .filter(cat => selectedCategories.includes(cat.id))
     .reduce((sum, cat) => sum + cat.count, 0);
@@ -80,8 +89,11 @@ const Index = () => {
             <div>
               <h1 className="text-3xl font-bold text-gray-900">360summits.com</h1>
               <p className="text-gray-600">Customer Data Management System</p>
+              {user && (
+                <p className="text-sm text-gray-500">Welcome, {user.email}</p>
+              )}
             </div>
-            <div className="flex space-x-4">
+            <div className="flex space-x-4 items-center">
               <Button 
                 onClick={() => setShowUploadDialog(true)}
                 className="bg-blue-600 hover:bg-blue-700"
@@ -96,6 +108,14 @@ const Index = () => {
               >
                 <Download className="w-4 h-4 mr-2" />
                 Export Selected ({selectedCategories.length})
+              </Button>
+              <Button 
+                onClick={handleSignOut}
+                variant="outline"
+                size="sm"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Sign Out
               </Button>
             </div>
           </div>
