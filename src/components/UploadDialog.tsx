@@ -16,6 +16,8 @@ import { parseCSV } from "@/utils/csvParser";
 import { uploadContacts } from "@/services/contactUploadService";
 import { FileUploadInput } from "@/components/FileUploadInput";
 import { UploadProgress } from "@/components/UploadProgress";
+import { BucketSelector } from "@/components/BucketSelector";
+import type { MainBucketId } from "@/services/bucketCategorizationService";
 
 interface UploadDialogProps {
   open: boolean;
@@ -24,6 +26,7 @@ interface UploadDialogProps {
 
 export const UploadDialog = ({ open, onOpenChange }: UploadDialogProps) => {
   const [file, setFile] = useState<File | null>(null);
+  const [selectedBucket, setSelectedBucket] = useState<MainBucketId>('biz-op');
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const { toast } = useToast();
@@ -59,19 +62,20 @@ export const UploadDialog = ({ open, onOpenChange }: UploadDialogProps) => {
         throw new Error("No valid contacts found in CSV file. Please ensure your CSV has an 'Email' column with valid email addresses.");
       }
 
-      setProgress(20);
+      setProgress(10);
       
-      await uploadContacts(contacts, setProgress);
+      await uploadContacts(contacts, selectedBucket, setProgress);
 
       setProgress(100);
       
       // Invalidate queries to refresh the UI
       queryClient.invalidateQueries({ queryKey: ["contacts"] });
       queryClient.invalidateQueries({ queryKey: ["contacts-count"] });
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
       
       toast({
         title: "Upload successful",
-        description: `${contacts.length} contacts have been processed and added to the database.`,
+        description: `${contacts.length} contacts have been processed and added to the ${selectedBucket} bucket.`,
       });
       
       setTimeout(() => {
@@ -99,7 +103,7 @@ export const UploadDialog = ({ open, onOpenChange }: UploadDialogProps) => {
         <DialogHeader>
           <DialogTitle>Upload Customer Data</DialogTitle>
           <DialogDescription>
-            Upload a CSV file containing your customer data for automatic categorization.
+            Upload a CSV file and select which main bucket the contacts should be placed in.
           </DialogDescription>
         </DialogHeader>
 
@@ -116,6 +120,13 @@ export const UploadDialog = ({ open, onOpenChange }: UploadDialogProps) => {
             onFileChange={handleFileChange}
             disabled={uploading}
           />
+
+          {file && !uploading && (
+            <BucketSelector
+              selectedBucket={selectedBucket}
+              onBucketChange={(bucket) => setSelectedBucket(bucket as MainBucketId)}
+            />
+          )}
 
           {uploading && <UploadProgress progress={progress} />}
 
