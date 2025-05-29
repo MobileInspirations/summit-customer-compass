@@ -11,13 +11,15 @@ import { useAuth } from "@/hooks/useAuth";
 import { DashboardHeader } from "@/components/Dashboard/DashboardHeader";
 import { StatsCards } from "@/components/Dashboard/StatsCards";
 import { CategoriesSection } from "@/components/Dashboard/CategoriesSection";
-import { QuickActions } from "@/components/Dashboard/QuickActions";
+import { BucketSelector } from "@/components/BucketSelector";
 import { UploadDialog } from "@/components/UploadDialog";
 import { ExportDialog } from "@/components/ExportDialog";
 import { CategorizationProgress } from "@/components/CategorizationProgress";
+import type { MainBucketId } from "@/services/bucketCategorizationService";
 
 const Index = () => {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedBucket, setSelectedBucket] = useState<MainBucketId>('biz-op');
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [isCategorizing, setIsCategorizing] = useState(false);
@@ -209,7 +211,10 @@ const Index = () => {
           onCategorySelect={handleCategorySelect}
         />
 
-        <QuickActions />
+        <BucketSelector
+          selectedBucket={selectedBucket}
+          onBucketChange={(bucket) => setSelectedBucket(bucket as MainBucketId)}
+        />
       </div>
 
       <UploadDialog 
