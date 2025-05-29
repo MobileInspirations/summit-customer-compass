@@ -1,6 +1,5 @@
-
 import { useState } from "react";
-import { Upload, Download, Users, Database, Filter, LogOut, Tags } from "lucide-react";
+import { Upload, Download, Users, Database, Filter, LogOut, Tags, ArrowUpDown, FileSpreadsheet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -75,6 +74,22 @@ const Index = () => {
     }
   };
 
+  const handleSortContacts = () => {
+    // Placeholder function for sorting contacts
+    toast({
+      title: "Sort Contacts",
+      description: "Contact sorting functionality will be implemented here.",
+    });
+  };
+
+  const handleExportAllTags = () => {
+    // Placeholder function for exporting all tags
+    toast({
+      title: "Export All Tags",
+      description: "Tag export functionality will be implemented here.",
+    });
+  };
+
   const handleSignOut = async () => {
     await signOut();
     toast({
@@ -118,6 +133,20 @@ const Index = () => {
               >
                 <Upload className="w-4 h-4 mr-2" />
                 Upload Data
+              </Button>
+              <Button 
+                onClick={handleSortContacts}
+                variant="outline"
+              >
+                <ArrowUpDown className="w-4 h-4 mr-2" />
+                Sort Contacts
+              </Button>
+              <Button 
+                onClick={handleExportAllTags}
+                variant="outline"
+              >
+                <FileSpreadsheet className="w-4 h-4 mr-2" />
+                Export All Tags
               </Button>
               <Button 
                 onClick={handleCategorizeAll}
