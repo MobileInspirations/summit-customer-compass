@@ -5,9 +5,11 @@ export const exportAllTags = async () => {
   console.log("Exporting all tags from all contacts summit_history");
   
   // Get ALL contacts with their summit_history tags (including null ones)
+  // Remove the default 1000 limit by using .range() with a large number
   const { data: contacts, error: contactsError } = await supabase
     .from("contacts")
-    .select("id, email, full_name, company, summit_history");
+    .select("id, email, full_name, company, summit_history")
+    .range(0, 999999); // This will fetch up to 1 million contacts
 
   if (contactsError) {
     console.error("Error fetching contacts:", contactsError);
