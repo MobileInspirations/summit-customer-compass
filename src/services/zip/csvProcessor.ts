@@ -19,44 +19,53 @@ export const processZipStructure = async (files: ZipFileEntry[]): Promise<Proces
     if (!file.name.endsWith('.csv')) continue;
 
     const pathParts = file.path;
-    if (pathParts.length < 2) continue;
+    if (pathParts.length < 1) continue;
 
-    // Extract bucket from first level folder (Biz, Health, Survivalist)
+    // Extract bucket from first level folder with more flexible mapping
     const bucketName = pathParts[0];
     let bucket: MainBucketId;
     
-    switch (bucketName.toLowerCase()) {
-      case 'biz':
-        bucket = 'biz-op';
-        break;
-      case 'health':
-        bucket = 'health';
-        break;
-      case 'survivalist':
-        bucket = 'survivalist';
-        break;
-      default:
-        console.warn(`Unknown bucket: ${bucketName}, skipping file ${file.name}`);
-        continue;
+    // More flexible bucket mapping
+    const lowerBucketName = bucketName.toLowerCase();
+    if (lowerBucketName.includes('biz') || lowerBucketName.includes('business') || lowerBucketName.includes('aweber')) {
+      bucket = 'biz-op';
+    } else if (lowerBucketName.includes('health') || lowerBucketName.includes('medical') || lowerBucketName.includes('wellness')) {
+      bucket = 'health';
+    } else if (lowerBucketName.includes('survivalist') || lowerBucketName.includes('survival') || lowerBucketName.includes('prepper')) {
+      bucket = 'survivalist';
+    } else {
+      // Default to biz-op for unknown folders
+      console.warn(`Unknown bucket: ${bucketName}, defaulting to biz-op bucket for file ${file.name}`);
+      bucket = 'biz-op';
     }
 
-    // Extract summit name from second level folder
-    const summitName = pathParts[1];
+    // Extract summit name - if there's a second level folder, use it, otherwise use the filename without engagement prefix
+    let summitName: string;
+    if (pathParts.length >= 2) {
+      summitName = pathParts[1];
+    } else {
+      // Extract summit name from filename by removing engagement prefix
+      const filename = file.name.replace(/\.(csv|CSV)$/, '');
+      summitName = filename.replace(/^[HLMU]-/i, '').trim();
+    }
 
     // Extract engagement level from filename (H-, L-, M-, U-)
     const filename = file.name;
-    const engagementMatch = filename.match(/^([HLMU])-/);
+    const engagementMatch = filename.match(/^([HLMU])-/i);
     if (!engagementMatch) {
-      console.warn(`No engagement level found in filename: ${filename}`);
+      console.warn(`No engagement level found in filename: ${filename}, defaulting to M`);
+      // Default to M (Medium) if no engagement level found
+      const csvContacts = parseCSVContent(file.content, summitName, 'M', bucket);
+      contacts.push(...csvContacts);
       continue;
     }
-    const engagementLevel = engagementMatch[1] as 'H' | 'L' | 'M' | 'U';
+    const engagementLevel = engagementMatch[1].toUpperCase() as 'H' | 'L' | 'M' | 'U';
 
     // Parse CSV content
     const csvContacts = parseCSVContent(file.content, summitName, engagementLevel, bucket);
     contacts.push(...csvContacts);
     
-    console.log(`Processed ${csvContacts.length} contacts from ${file.name} (${summitName}, ${engagementLevel})`);
+    console.log(`Processed ${csvContacts.length} contacts from ${file.name} (${summitName}, ${engagementLevel}, ${bucket})`);
   }
 
   return contacts;
