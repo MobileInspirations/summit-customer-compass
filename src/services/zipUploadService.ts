@@ -10,7 +10,8 @@ export const processZipUpload = async (
   onProgress: (progress: number) => void
 ): Promise<void> => {
   try {
-    console.log('Starting zip file processing...');
+    console.log('=== Starting ZIP file processing ===');
+    console.log(`ZIP file: ${zipFile.name}, Size: ${zipFile.size} bytes`);
     onProgress(5);
 
     // Ensure main buckets exist
@@ -47,13 +48,19 @@ export const processZipUpload = async (
     onProgress(50);
 
     // Upload contacts in batches with proper merging
-    console.log('Starting batch upload...');
-    await uploadContactsInBatches(contactsByBucket, onProgress);
+    console.log('=== Starting batch upload phase ===');
+    try {
+      await uploadContactsInBatches(contactsByBucket, onProgress);
+      console.log('Batch upload completed successfully');
+    } catch (uploadError) {
+      console.error('Error during batch upload:', uploadError);
+      throw new Error(`Failed during contact upload: ${uploadError.message}`);
+    }
+    
     onProgress(100);
-
-    console.log('Zip file processing completed successfully');
+    console.log('=== ZIP file processing completed successfully ===');
   } catch (error) {
-    console.error('Error during ZIP processing:', error);
+    console.error('=== ERROR during ZIP processing ===', error);
     throw error;
   }
 };
