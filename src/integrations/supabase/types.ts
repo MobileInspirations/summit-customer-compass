@@ -50,27 +50,33 @@ export type Database = {
           company: string | null
           created_at: string
           email: string
+          engagement_level: string | null
           full_name: string | null
           id: string
           summit_history: string[] | null
+          tags: string[] | null
           updated_at: string
         }
         Insert: {
           company?: string | null
           created_at?: string
           email: string
+          engagement_level?: string | null
           full_name?: string | null
           id?: string
           summit_history?: string[] | null
+          tags?: string[] | null
           updated_at?: string
         }
         Update: {
           company?: string | null
           created_at?: string
           email?: string
+          engagement_level?: string | null
           full_name?: string | null
           id?: string
           summit_history?: string[] | null
+          tags?: string[] | null
           updated_at?: string
         }
         Relationships: []

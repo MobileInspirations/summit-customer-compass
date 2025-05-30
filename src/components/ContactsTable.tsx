@@ -7,22 +7,24 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, Users, Download } from "lucide-react";
+import ZipUploadDialog from "./ZipUploadDialog";
 
 const ContactsTable = () => {
-  const { data: contacts = [], isLoading, error } = useContacts();
+  const { data: contacts = [], isLoading, error, refetch } = useContacts();
   const [searchTerm, setSearchTerm] = useState("");
 
   // Filter contacts based on search term
   const filteredContacts = contacts.filter(contact => 
     contact.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     contact.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    contact.company?.toLowerCase().includes(searchTerm.toLowerCase())
+    contact.company?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    contact.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const handleExportContacts = () => {
-    const csvHeaders = "Name,Email,Company,Created Date,Summit History Count\n";
+    const csvHeaders = "Name,Email,Company,Engagement Level,Tags,Summit History,Created Date\n";
     const csvRows = filteredContacts.map(contact => 
-      `"${contact.full_name || ''}","${contact.email}","${contact.company || ''}","${contact.created_at}","${contact.summit_history?.length || 0}"`
+      `"${contact.full_name || ''}","${contact.email}","${contact.company || ''}","${contact.engagement_level || ''}","${contact.tags?.join(';') || ''}","${contact.summit_history?.join(';') || ''}","${contact.created_at}"`
     ).join("\n");
     
     const csvContent = csvHeaders + csvRows;
@@ -36,6 +38,26 @@ const ContactsTable = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const getEngagementBadgeVariant = (level?: string) => {
+    switch (level) {
+      case 'H': return 'destructive';
+      case 'M': return 'default';
+      case 'L': return 'secondary';
+      case 'U': return 'outline';
+      default: return 'secondary';
+    }
+  };
+
+  const getEngagementLabel = (level?: string) => {
+    switch (level) {
+      case 'H': return 'High';
+      case 'M': return 'Medium';
+      case 'L': return 'Low';
+      case 'U': return 'Unengaged';
+      default: return 'Unknown';
+    }
   };
 
   if (isLoading) {
@@ -80,6 +102,7 @@ const ContactsTable = () => {
                 className="pl-10 w-64"
               />
             </div>
+            <ZipUploadDialog onUploadComplete={() => refetch()} />
             <Button onClick={handleExportContacts} variant="outline">
               <Download className="w-4 h-4 mr-2" />
               Export CSV
@@ -95,14 +118,16 @@ const ContactsTable = () => {
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Company</TableHead>
+                <TableHead>Engagement</TableHead>
                 <TableHead>Tags</TableHead>
+                <TableHead>Summit History</TableHead>
                 <TableHead>Created</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredContacts.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                  <TableCell colSpan={7} className="text-center py-8 text-gray-500">
                     {searchTerm ? "No contacts match your search" : "No contacts found"}
                   </TableCell>
                 </TableRow>
@@ -115,12 +140,39 @@ const ContactsTable = () => {
                     <TableCell>{contact.email}</TableCell>
                     <TableCell>{contact.company || "—"}</TableCell>
                     <TableCell>
-                      {contact.summit_history && contact.summit_history.length > 0 ? (
-                        <Badge variant="outline">
-                          {contact.summit_history.length} tags
+                      {contact.engagement_level ? (
+                        <Badge variant={getEngagementBadgeVariant(contact.engagement_level)}>
+                          {getEngagementLabel(contact.engagement_level)}
                         </Badge>
                       ) : (
-                        <span className="text-gray-400">No tags</span>
+                        <span className="text-gray-400">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {contact.tags && contact.tags.length > 0 ? (
+                          contact.tags.slice(0, 2).map((tag, index) => (
+                            <Badge key={index} variant="outline" className="text-xs">
+                              {tag}
+                            </Badge>
+                          ))
+                        ) : (
+                          <span className="text-gray-400">No tags</span>
+                        )}
+                        {contact.tags && contact.tags.length > 2 && (
+                          <Badge variant="outline" className="text-xs">
+                            +{contact.tags.length - 2}
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {contact.summit_history && contact.summit_history.length > 0 ? (
+                        <Badge variant="outline">
+                          {contact.summit_history.length} summit{contact.summit_history.length !== 1 ? 's' : ''}
+                        </Badge>
+                      ) : (
+                        <span className="text-gray-400">None</span>
                       )}
                     </TableCell>
                     <TableCell className="text-gray-500">
