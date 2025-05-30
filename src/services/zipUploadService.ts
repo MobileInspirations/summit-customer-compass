@@ -101,7 +101,7 @@ const processZipStructure = async (files: ZipFileEntry[]): Promise<ProcessedCont
     
     switch (bucketName.toLowerCase()) {
       case 'biz':
-        bucket = 'business';
+        bucket = 'biz-op';
         break;
       case 'health':
         bucket = 'health';
@@ -202,9 +202,10 @@ const isValidEmail = (email: string): boolean => {
 
 const groupContactsByBucket = (contacts: ProcessedContact[]): Record<MainBucketId, ProcessedContact[]> => {
   const grouped: Record<MainBucketId, ProcessedContact[]> = {
-    business: [],
+    'biz-op': [],
     health: [],
-    survivalist: []
+    survivalist: [],
+    'cannot-place': []
   };
 
   contacts.forEach(contact => {
