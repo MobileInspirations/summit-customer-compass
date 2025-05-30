@@ -26,40 +26,65 @@ export const fetchUncategorizedContacts = async (contactIds?: string[], limit?: 
     return contacts || [];
   }
 
-  // Use a LEFT JOIN approach to find uncategorized contacts more efficiently
-  let query = supabase
-    .from('contacts')
-    .select(`
-      id, 
-      email, 
-      full_name, 
-      company, 
-      summit_history,
-      contact_categories!left (contact_id)
-    `)
-    .is('contact_categories.contact_id', null);
+  // For large datasets, we need to fetch in batches due to Supabase limitations
+  let allUncategorizedContacts: any[] = [];
+  let hasMore = true;
+  let offset = 0;
+  const batchSize = 1000; // Supabase's effective limit
 
-  // Only apply limit if specified
-  if (limit) {
-    query = query.limit(limit);
+  while (hasMore && (!limit || allUncategorizedContacts.length < limit)) {
+    console.log(`Fetching batch starting at offset ${offset}`);
+    
+    // Use a LEFT JOIN approach to find uncategorized contacts more efficiently
+    const { data: contacts, error } = await supabase
+      .from('contacts')
+      .select(`
+        id, 
+        email, 
+        full_name, 
+        company, 
+        summit_history,
+        contact_categories!left (contact_id)
+      `)
+      .is('contact_categories.contact_id', null)
+      .range(offset, offset + batchSize - 1);
+
+    if (error) {
+      console.error('Error fetching uncategorized contacts batch:', error);
+      throw error;
+    }
+
+    if (!contacts || contacts.length === 0) {
+      hasMore = false;
+      break;
+    }
+
+    // Transform the data to remove the join column
+    const batchUncategorizedContacts = contacts.map(contact => ({
+      id: contact.id,
+      email: contact.email,
+      full_name: contact.full_name,
+      company: contact.company,
+      summit_history: contact.summit_history
+    }));
+
+    allUncategorizedContacts = allUncategorizedContacts.concat(batchUncategorizedContacts);
+    console.log(`Fetched batch of ${contacts.length} contacts. Total so far: ${allUncategorizedContacts.length}`);
+
+    // If we got less than the batch size, we've reached the end
+    if (contacts.length < batchSize) {
+      hasMore = false;
+    }
+
+    // If we have a limit and we've reached it, stop
+    if (limit && allUncategorizedContacts.length >= limit) {
+      allUncategorizedContacts = allUncategorizedContacts.slice(0, limit);
+      hasMore = false;
+    }
+
+    offset += batchSize;
   }
 
-  const { data: contacts, error } = await query;
-
-  if (error) {
-    console.error('Error fetching uncategorized contacts:', error);
-    throw error;
-  }
-
-  // Transform the data to remove the join column
-  const uncategorizedContacts = contacts?.map(contact => ({
-    id: contact.id,
-    email: contact.email,
-    full_name: contact.full_name,
-    company: contact.company,
-    summit_history: contact.summit_history
-  })) || [];
-
-  console.log(`Fetched ${uncategorizedContacts.length} uncategorized contacts${limit ? ` (limit was ${limit})` : ' (no limit)'}`);
-  return uncategorizedContacts;
+  console.log(`Fetched ${allUncategorizedContacts.length} total uncategorized contacts${limit ? ` (limit was ${limit})` : ' (no limit)'}`);
+  return allUncategorizedContacts;
 };
