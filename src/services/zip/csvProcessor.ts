@@ -1,4 +1,3 @@
-
 import { type MainBucketId } from "../bucketCategorizationService";
 import { type ZipFileEntry } from "./zipExtractor";
 
@@ -13,30 +12,44 @@ export interface ProcessedContact {
 }
 
 export const processZipStructure = async (files: ZipFileEntry[]): Promise<ProcessedContact[]> => {
+  console.log(`Starting to process ${files.length} files from ZIP`);
   const contacts: ProcessedContact[] = [];
 
   for (const file of files) {
-    if (!file.name.endsWith('.csv')) continue;
+    console.log(`Processing file: ${file.name} at path: ${file.path.join('/')}`);
+    
+    if (!file.name.endsWith('.csv')) {
+      console.log(`Skipping non-CSV file: ${file.name}`);
+      continue;
+    }
 
     const pathParts = file.path;
-    if (pathParts.length < 1) continue;
+    if (pathParts.length < 1) {
+      console.log(`Skipping file with empty path: ${file.name}`);
+      continue;
+    }
 
     // Check if this is from the "Aweber lists" main folder
     const mainFolder = pathParts[0];
     let bucket: MainBucketId;
     let summitName: string;
 
+    console.log(`Main folder detected: ${mainFolder}`);
+
     if (mainFolder.toLowerCase().includes('aweber')) {
       // This is from Aweber lists - default to biz-op bucket
       bucket = 'biz-op';
+      console.log(`Assigned to biz-op bucket (Aweber folder detected)`);
       
       // If there's a subfolder, use it as the summit name
       if (pathParts.length >= 2) {
         summitName = pathParts[1];
+        console.log(`Summit name from subfolder: ${summitName}`);
       } else {
         // Extract summit name from filename by removing engagement prefix
         const filename = file.name.replace(/\.(csv|CSV)$/, '');
         summitName = filename.replace(/^[HLMU]-/i, '').trim();
+        console.log(`Summit name from filename: ${summitName}`);
       }
     } else {
       // Handle other bucket structures with flexible mapping
@@ -75,13 +88,19 @@ export const processZipStructure = async (files: ZipFileEntry[]): Promise<Proces
     }
     const engagementLevel = engagementMatch[1].toUpperCase() as 'H' | 'L' | 'M' | 'U';
 
+    console.log(`Processing ${filename} - Summit: ${summitName}, Engagement: ${engagementLevel}, Bucket: ${bucket}`);
+
     // Parse CSV content
-    const csvContacts = parseCSVContent(file.content, summitName, engagementLevel, bucket);
-    contacts.push(...csvContacts);
-    
-    console.log(`Processed ${csvContacts.length} contacts from ${file.name} (${summitName}, ${engagementLevel}, ${bucket})`);
+    try {
+      const csvContacts = parseCSVContent(file.content, summitName, engagementLevel, bucket);
+      contacts.push(...csvContacts);
+      console.log(`Successfully processed ${csvContacts.length} contacts from ${file.name}`);
+    } catch (error) {
+      console.error(`Error parsing CSV content for ${file.name}:`, error);
+    }
   }
 
+  console.log(`Total contacts processed: ${contacts.length}`);
   return contacts;
 };
 
@@ -91,8 +110,15 @@ const parseCSVContent = (
   engagementLevel: 'H' | 'L' | 'M' | 'U',
   bucket: MainBucketId
 ): ProcessedContact[] => {
+  console.log(`Parsing CSV content for summit: ${summitName}, engagement: ${engagementLevel}, bucket: ${bucket}`);
+  
   const lines = content.split('\n').filter(line => line.trim());
-  if (lines.length <= 1) return []; // No data or only header
+  console.log(`CSV has ${lines.length} lines`);
+  
+  if (lines.length <= 1) {
+    console.log('No data rows found in CSV');
+    return [];
+  }
 
   const contacts: ProcessedContact[] = [];
   
@@ -101,24 +127,32 @@ const parseCSVContent = (
     const line = lines[i].trim();
     if (!line) continue;
 
-    // Parse CSV line (assuming email is first column, name second, company third)
-    const columns = parseCSVLine(line);
-    if (columns.length === 0 || !columns[0]) continue;
+    try {
+      // Parse CSV line (assuming email is first column, name second, company third)
+      const columns = parseCSVLine(line);
+      if (columns.length === 0 || !columns[0]) continue;
 
-    const email = columns[0].trim();
-    if (!email || !isValidEmail(email)) continue;
+      const email = columns[0].trim();
+      if (!email || !isValidEmail(email)) {
+        console.log(`Invalid email found: ${email}`);
+        continue;
+      }
 
-    contacts.push({
-      email,
-      name: columns[1]?.trim() || undefined,
-      company: columns[2]?.trim() || undefined,
-      summit_history: [summitName],
-      engagement_level: engagementLevel,
-      tags: [summitName],
-      bucket
-    });
+      contacts.push({
+        email,
+        name: columns[1]?.trim() || undefined,
+        company: columns[2]?.trim() || undefined,
+        summit_history: [summitName],
+        engagement_level: engagementLevel,
+        tags: [summitName],
+        bucket
+      });
+    } catch (error) {
+      console.error(`Error parsing line ${i}: ${line}`, error);
+    }
   }
 
+  console.log(`Parsed ${contacts.length} valid contacts from CSV`);
   return contacts;
 };
 
