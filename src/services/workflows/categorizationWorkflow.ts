@@ -44,8 +44,9 @@ export const runCategorizationWorkflow = async (
 
   console.log(`Total uncategorized contacts to categorize: ${allContacts.length}`);
 
-  // Process contacts in batches of 5,000 to improve performance
-  const processingBatchSize = 5000;
+  // Process contacts in larger batches with parallel processing
+  const processingBatchSize = 10000; // Increased to 10k
+  const parallelBatchSize = 100; // Process 100 contacts in parallel within each batch
   const totalBatches = Math.ceil(allContacts.length / processingBatchSize);
   let processedCount = 0;
 
@@ -54,44 +55,42 @@ export const runCategorizationWorkflow = async (
     onProgress(createProgressUpdate(0, allContacts.length, 1, totalBatches));
   }
 
-  // Small delay to ensure the initial progress is shown
-  await new Promise(resolve => setTimeout(resolve, 100));
-
   for (let i = 0; i < allContacts.length; i += processingBatchSize) {
     const batch = allContacts.slice(i, i + processingBatchSize);
     const currentBatch = Math.floor(i / processingBatchSize) + 1;
     
     console.log(`Processing batch ${currentBatch}/${totalBatches} with ${batch.length} contacts`);
     
-    // Process each contact individually to track progress better
-    for (let j = 0; j < batch.length; j++) {
-      const contact = batch[j];
-      try {
-        await categorizeContact(contact as ContactForCategorization, categories);
-        processedCount++;
-        
-        // Update progress more frequently (every 100 contacts or end of batch)
-        if (processedCount % 100 === 0 || j === batch.length - 1) {
-          if (onProgress) {
-            const progressUpdate = createProgressUpdate(processedCount, allContacts.length, currentBatch, totalBatches);
-            console.log(`Progress update: ${progressUpdate.progress}% - Processed ${processedCount}/${allContacts.length} contacts`);
-            onProgress(progressUpdate);
-          }
-          // Small delay to allow UI updates
-          await new Promise(resolve => setTimeout(resolve, 10));
+    // Process contacts in parallel sub-batches for much faster processing
+    for (let j = 0; j < batch.length; j += parallelBatchSize) {
+      const parallelBatch = batch.slice(j, j + parallelBatchSize);
+      
+      // Process this sub-batch in parallel
+      const promises = parallelBatch.map(async (contact) => {
+        try {
+          await categorizeContact(contact as ContactForCategorization, categories);
+          return true;
+        } catch (error) {
+          console.error(`Error categorizing contact ${contact.email}:`, error);
+          return true; // Still count as processed
         }
-      } catch (error) {
-        console.error(`Error categorizing contact ${contact.email}:`, error);
-        processedCount++; // Still count as processed to maintain progress
+      });
+      
+      await Promise.all(promises);
+      processedCount += parallelBatch.length;
+      
+      // Update progress more frequently
+      if (onProgress) {
+        const progressUpdate = createProgressUpdate(processedCount, allContacts.length, currentBatch, totalBatches);
+        console.log(`Progress update: ${progressUpdate.progress}% - Processed ${processedCount}/${allContacts.length} contacts`);
+        onProgress(progressUpdate);
       }
+      
+      // Minimal delay to allow UI updates - reduced significantly
+      await new Promise(resolve => setTimeout(resolve, 1));
     }
     
     console.log(`Completed batch ${currentBatch}/${totalBatches}. Processed ${processedCount}/${allContacts.length} contacts`);
-
-    // Delay between batches to prevent overwhelming the system
-    if (currentBatch < totalBatches) {
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
   }
 
   // Final progress update
