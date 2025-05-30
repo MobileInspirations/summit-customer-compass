@@ -58,9 +58,9 @@ export const runEnhancedCategorizationWorkflow = async (
 
   console.log(`Total uncategorized contacts to categorize: ${allContacts.length}`);
 
-  // Process contacts with optimized batch sizes
-  const batchSize = useAI ? 1000 : 5000; // AI: 1k, Regular: 5k
-  const parallelSize = useAI ? 1 : 100; // No parallel for AI due to rate limits
+  // Optimized batch processing
+  const batchSize = useAI ? 50 : 1000; // Smaller AI batches but much larger than before
+  const parallelSize = useAI ? 5 : 100; // Process 5 AI requests in parallel to speed up
   const totalBatches = Math.ceil(allContacts.length / batchSize);
   let processedCount = 0;
 
@@ -75,55 +75,34 @@ export const runEnhancedCategorizationWorkflow = async (
     
     console.log(`Processing batch ${currentBatch}/${totalBatches} with ${batch.length} contacts${useAI ? ' (using AI)' : ''}`);
     
-    if (useAI) {
-      // Process AI requests sequentially to respect rate limits
-      for (let j = 0; j < batch.length; j++) {
-        const contact = batch[j];
+    // Process in parallel sub-batches for both AI and regular categorization
+    for (let j = 0; j < batch.length; j += parallelSize) {
+      const parallelBatch = batch.slice(j, j + parallelSize);
+      
+      // Process this sub-batch in parallel
+      const promises = parallelBatch.map(async (contact) => {
         try {
           await categorizeContactEnhanced(contact as ContactForCategorization, categories, useAI);
-          processedCount++;
-          
-          // Update progress more frequently for AI (every 10 contacts)
-          if (processedCount % 10 === 0 || j === batch.length - 1) {
-            if (onProgress) {
-              const progressUpdate = createProgressUpdate(processedCount, allContacts.length, currentBatch, totalBatches);
-              console.log(`AI Progress update: ${progressUpdate.progress}% - Processed ${processedCount}/${allContacts.length} contacts`);
-              onProgress(progressUpdate);
-            }
-          }
-          
-          // Minimal delay between AI requests
-          await new Promise(resolve => setTimeout(resolve, 10));
+          return true;
         } catch (error) {
           console.error(`Error categorizing contact ${contact.email}:`, error);
-          processedCount++; // Still count as processed to maintain progress
+          return true; // Still count as processed
         }
+      });
+      
+      await Promise.all(promises);
+      processedCount += parallelBatch.length;
+      
+      // Update progress more frequently for better UX
+      if (onProgress) {
+        const progressUpdate = createProgressUpdate(processedCount, allContacts.length, currentBatch, totalBatches);
+        console.log(`Progress update: ${progressUpdate.progress}% - Processed ${processedCount}/${allContacts.length} contacts`);
+        onProgress(progressUpdate);
       }
-    } else {
-      // Process in parallel sub-batches for non-AI categorization
-      for (let j = 0; j < batch.length; j += parallelSize) {
-        const parallelBatch = batch.slice(j, j + parallelSize);
-        
-        // Process this sub-batch in parallel
-        const promises = parallelBatch.map(async (contact) => {
-          try {
-            await categorizeContactEnhanced(contact as ContactForCategorization, categories, useAI);
-            return true;
-          } catch (error) {
-            console.error(`Error categorizing contact ${contact.email}:`, error);
-            return true; // Still count as processed
-          }
-        });
-        
-        await Promise.all(promises);
-        processedCount += parallelBatch.length;
-        
-        // Update progress frequently
-        if (onProgress) {
-          const progressUpdate = createProgressUpdate(processedCount, allContacts.length, currentBatch, totalBatches);
-          console.log(`Progress update: ${progressUpdate.progress}% - Processed ${processedCount}/${allContacts.length} contacts`);
-          onProgress(progressUpdate);
-        }
+      
+      // Very minimal delay only for AI to respect rate limits
+      if (useAI) {
+        await new Promise(resolve => setTimeout(resolve, 100)); // Reduced from longer delays
       }
     }
     

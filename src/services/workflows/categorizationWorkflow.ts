@@ -44,9 +44,9 @@ export const runCategorizationWorkflow = async (
 
   console.log(`Total uncategorized contacts to categorize: ${allContacts.length}`);
 
-  // Process contacts in batches of 5000 with parallel processing
-  const batchSize = 5000;
-  const parallelSize = 100; // Process 100 contacts in parallel within each batch
+  // Optimized processing - larger batches with higher parallelism
+  const batchSize = 2000; // Larger batches for better throughput
+  const parallelSize = 200; // Higher parallel processing
   const totalBatches = Math.ceil(allContacts.length / batchSize);
   let processedCount = 0;
 
@@ -79,7 +79,7 @@ export const runCategorizationWorkflow = async (
       await Promise.all(promises);
       processedCount += parallelBatch.length;
       
-      // Update progress frequently
+      // Update progress frequently for better UX
       if (onProgress) {
         const progressUpdate = createProgressUpdate(processedCount, allContacts.length, currentBatch, totalBatches);
         console.log(`Progress update: ${progressUpdate.progress}% - Processed ${processedCount}/${allContacts.length} contacts`);
