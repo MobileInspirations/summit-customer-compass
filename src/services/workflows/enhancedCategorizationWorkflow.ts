@@ -59,9 +59,9 @@ export const runEnhancedCategorizationWorkflow = async (
   console.log(`Total uncategorized contacts to categorize: ${allContacts.length}`);
 
   // Process contacts with optimized batch sizes
-  const processingBatchSize = useAI ? 2000 : 10000; // Larger batches
-  const parallelBatchSize = useAI ? 1 : 100; // No parallel for AI due to rate limits
-  const totalBatches = Math.ceil(allContacts.length / processingBatchSize);
+  const batchSize = useAI ? 1000 : 5000; // AI: 1k, Regular: 5k
+  const parallelSize = useAI ? 1 : 100; // No parallel for AI due to rate limits
+  const totalBatches = Math.ceil(allContacts.length / batchSize);
   let processedCount = 0;
 
   // Initial progress update with actual numbers
@@ -69,9 +69,9 @@ export const runEnhancedCategorizationWorkflow = async (
     onProgress(createProgressUpdate(0, allContacts.length, 1, totalBatches));
   }
 
-  for (let i = 0; i < allContacts.length; i += processingBatchSize) {
-    const batch = allContacts.slice(i, i + processingBatchSize);
-    const currentBatch = Math.floor(i / processingBatchSize) + 1;
+  for (let i = 0; i < allContacts.length; i += batchSize) {
+    const batch = allContacts.slice(i, i + batchSize);
+    const currentBatch = Math.floor(i / batchSize) + 1;
     
     console.log(`Processing batch ${currentBatch}/${totalBatches} with ${batch.length} contacts${useAI ? ' (using AI)' : ''}`);
     
@@ -83,8 +83,8 @@ export const runEnhancedCategorizationWorkflow = async (
           await categorizeContactEnhanced(contact as ContactForCategorization, categories, useAI);
           processedCount++;
           
-          // Update progress more frequently for AI (every 5 contacts)
-          if (processedCount % 5 === 0 || j === batch.length - 1) {
+          // Update progress more frequently for AI (every 10 contacts)
+          if (processedCount % 10 === 0 || j === batch.length - 1) {
             if (onProgress) {
               const progressUpdate = createProgressUpdate(processedCount, allContacts.length, currentBatch, totalBatches);
               console.log(`AI Progress update: ${progressUpdate.progress}% - Processed ${processedCount}/${allContacts.length} contacts`);
@@ -92,8 +92,8 @@ export const runEnhancedCategorizationWorkflow = async (
             }
           }
           
-          // Reduced delay between AI requests
-          await new Promise(resolve => setTimeout(resolve, 50));
+          // Minimal delay between AI requests
+          await new Promise(resolve => setTimeout(resolve, 10));
         } catch (error) {
           console.error(`Error categorizing contact ${contact.email}:`, error);
           processedCount++; // Still count as processed to maintain progress
@@ -101,8 +101,8 @@ export const runEnhancedCategorizationWorkflow = async (
       }
     } else {
       // Process in parallel sub-batches for non-AI categorization
-      for (let j = 0; j < batch.length; j += parallelBatchSize) {
-        const parallelBatch = batch.slice(j, j + parallelBatchSize);
+      for (let j = 0; j < batch.length; j += parallelSize) {
+        const parallelBatch = batch.slice(j, j + parallelSize);
         
         // Process this sub-batch in parallel
         const promises = parallelBatch.map(async (contact) => {
@@ -118,15 +118,12 @@ export const runEnhancedCategorizationWorkflow = async (
         await Promise.all(promises);
         processedCount += parallelBatch.length;
         
-        // Update progress more frequently
+        // Update progress frequently
         if (onProgress) {
           const progressUpdate = createProgressUpdate(processedCount, allContacts.length, currentBatch, totalBatches);
           console.log(`Progress update: ${progressUpdate.progress}% - Processed ${processedCount}/${allContacts.length} contacts`);
           onProgress(progressUpdate);
         }
-        
-        // Minimal delay to allow UI updates
-        await new Promise(resolve => setTimeout(resolve, 1));
       }
     }
     

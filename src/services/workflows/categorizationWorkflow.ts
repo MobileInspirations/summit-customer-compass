@@ -44,10 +44,10 @@ export const runCategorizationWorkflow = async (
 
   console.log(`Total uncategorized contacts to categorize: ${allContacts.length}`);
 
-  // Process contacts in larger batches with parallel processing
-  const processingBatchSize = 10000; // Increased to 10k
-  const parallelBatchSize = 100; // Process 100 contacts in parallel within each batch
-  const totalBatches = Math.ceil(allContacts.length / processingBatchSize);
+  // Process contacts in batches of 5000 with parallel processing
+  const batchSize = 5000;
+  const parallelSize = 100; // Process 100 contacts in parallel within each batch
+  const totalBatches = Math.ceil(allContacts.length / batchSize);
   let processedCount = 0;
 
   // Initial progress update with actual numbers
@@ -55,15 +55,15 @@ export const runCategorizationWorkflow = async (
     onProgress(createProgressUpdate(0, allContacts.length, 1, totalBatches));
   }
 
-  for (let i = 0; i < allContacts.length; i += processingBatchSize) {
-    const batch = allContacts.slice(i, i + processingBatchSize);
-    const currentBatch = Math.floor(i / processingBatchSize) + 1;
+  for (let i = 0; i < allContacts.length; i += batchSize) {
+    const batch = allContacts.slice(i, i + batchSize);
+    const currentBatch = Math.floor(i / batchSize) + 1;
     
     console.log(`Processing batch ${currentBatch}/${totalBatches} with ${batch.length} contacts`);
     
     // Process contacts in parallel sub-batches for much faster processing
-    for (let j = 0; j < batch.length; j += parallelBatchSize) {
-      const parallelBatch = batch.slice(j, j + parallelBatchSize);
+    for (let j = 0; j < batch.length; j += parallelSize) {
+      const parallelBatch = batch.slice(j, j + parallelSize);
       
       // Process this sub-batch in parallel
       const promises = parallelBatch.map(async (contact) => {
@@ -79,15 +79,12 @@ export const runCategorizationWorkflow = async (
       await Promise.all(promises);
       processedCount += parallelBatch.length;
       
-      // Update progress more frequently
+      // Update progress frequently
       if (onProgress) {
         const progressUpdate = createProgressUpdate(processedCount, allContacts.length, currentBatch, totalBatches);
         console.log(`Progress update: ${progressUpdate.progress}% - Processed ${processedCount}/${allContacts.length} contacts`);
         onProgress(progressUpdate);
       }
-      
-      // Minimal delay to allow UI updates - reduced significantly
-      await new Promise(resolve => setTimeout(resolve, 1));
     }
     
     console.log(`Completed batch ${currentBatch}/${totalBatches}. Processed ${processedCount}/${allContacts.length} contacts`);
