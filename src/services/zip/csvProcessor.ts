@@ -21,32 +21,46 @@ export const processZipStructure = async (files: ZipFileEntry[]): Promise<Proces
     const pathParts = file.path;
     if (pathParts.length < 1) continue;
 
-    // Extract bucket from first level folder with more flexible mapping
-    const bucketName = pathParts[0];
+    // Check if this is from the "Aweber lists" main folder
+    const mainFolder = pathParts[0];
     let bucket: MainBucketId;
-    
-    // More flexible bucket mapping
-    const lowerBucketName = bucketName.toLowerCase();
-    if (lowerBucketName.includes('biz') || lowerBucketName.includes('business') || lowerBucketName.includes('aweber')) {
-      bucket = 'biz-op';
-    } else if (lowerBucketName.includes('health') || lowerBucketName.includes('medical') || lowerBucketName.includes('wellness')) {
-      bucket = 'health';
-    } else if (lowerBucketName.includes('survivalist') || lowerBucketName.includes('survival') || lowerBucketName.includes('prepper')) {
-      bucket = 'survivalist';
-    } else {
-      // Default to biz-op for unknown folders
-      console.warn(`Unknown bucket: ${bucketName}, defaulting to biz-op bucket for file ${file.name}`);
-      bucket = 'biz-op';
-    }
-
-    // Extract summit name - if there's a second level folder, use it, otherwise use the filename without engagement prefix
     let summitName: string;
-    if (pathParts.length >= 2) {
-      summitName = pathParts[1];
+
+    if (mainFolder.toLowerCase().includes('aweber')) {
+      // This is from Aweber lists - default to biz-op bucket
+      bucket = 'biz-op';
+      
+      // If there's a subfolder, use it as the summit name
+      if (pathParts.length >= 2) {
+        summitName = pathParts[1];
+      } else {
+        // Extract summit name from filename by removing engagement prefix
+        const filename = file.name.replace(/\.(csv|CSV)$/, '');
+        summitName = filename.replace(/^[HLMU]-/i, '').trim();
+      }
     } else {
-      // Extract summit name from filename by removing engagement prefix
-      const filename = file.name.replace(/\.(csv|CSV)$/, '');
-      summitName = filename.replace(/^[HLMU]-/i, '').trim();
+      // Handle other bucket structures with flexible mapping
+      const lowerBucketName = mainFolder.toLowerCase();
+      if (lowerBucketName.includes('biz') || lowerBucketName.includes('business')) {
+        bucket = 'biz-op';
+      } else if (lowerBucketName.includes('health') || lowerBucketName.includes('medical') || lowerBucketName.includes('wellness')) {
+        bucket = 'health';
+      } else if (lowerBucketName.includes('survivalist') || lowerBucketName.includes('survival') || lowerBucketName.includes('prepper')) {
+        bucket = 'survivalist';
+      } else {
+        // Default to biz-op for unknown folders
+        console.warn(`Unknown bucket: ${mainFolder}, defaulting to biz-op bucket for file ${file.name}`);
+        bucket = 'biz-op';
+      }
+
+      // Extract summit name - if there's a second level folder, use it, otherwise use the filename without engagement prefix
+      if (pathParts.length >= 2) {
+        summitName = pathParts[1];
+      } else {
+        // Extract summit name from filename by removing engagement prefix
+        const filename = file.name.replace(/\.(csv|CSV)$/, '');
+        summitName = filename.replace(/^[HLMU]-/i, '').trim();
+      }
     }
 
     // Extract engagement level from filename (H-, L-, M-, U-)
