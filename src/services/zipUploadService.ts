@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { ensureMainBucketsExist, assignContactsToBucket, type MainBucketId } from "./bucketCategorizationService";
 import { categorizeNewContacts } from "./contactCategorizationService";
@@ -51,7 +50,7 @@ export const processZipUpload = async (
   const contactsByBucket = groupContactsByBucket(allContacts);
   onProgress(50);
 
-  // Upload contacts in batches
+  // Upload contacts in batches with proper merging
   await uploadContactsInBatches(contactsByBucket, onProgress);
   onProgress(100);
 
@@ -229,13 +228,9 @@ const uploadContactsInBatches = async (
 
     console.log(`Processing ${contacts.length} contacts for ${bucket} bucket`);
 
-    // Deduplicate by email
-    const uniqueContacts = contacts.reduce((acc, contact) => {
-      acc[contact.email] = contact;
-      return acc;
-    }, {} as Record<string, ProcessedContact>);
-
-    const contactsToUpload = Object.values(uniqueContacts);
+    // Merge contacts by email, combining data from multiple entries
+    const mergedContacts = mergeContactsByEmail(contacts);
+    const contactsToUpload = Object.values(mergedContacts);
 
     // Upload in batches of 1000
     const batchSize = 1000;
@@ -244,28 +239,12 @@ const uploadContactsInBatches = async (
     for (let i = 0; i < contactsToUpload.length; i += batchSize) {
       const batch = contactsToUpload.slice(i, i + batchSize);
       
-      const contactsForInsert = batch.map(contact => ({
-        email: contact.email,
-        full_name: contact.name || null,
-        company: contact.company || null,
-        summit_history: contact.summit_history,
-        engagement_level: contact.engagement_level,
-        tags: contact.tags
-      }));
-
-      const { error } = await supabase
-        .from('contacts')
-        .upsert(contactsForInsert, { 
-          onConflict: 'email',
-          ignoreDuplicates: false 
-        });
-
-      if (error) {
-        console.error('Error inserting batch:', error);
-        throw error;
+      // Process each contact individually to handle updates properly
+      for (const contact of batch) {
+        await upsertContactWithMerging(contact);
+        uploadedEmails.push(contact.email);
       }
 
-      uploadedEmails.push(...batch.map(c => c.email));
       totalProcessed += batch.length;
 
       // Update progress
@@ -292,5 +271,91 @@ const uploadContactsInBatches = async (
     console.log('Categorization completed');
   } catch (error) {
     console.error('Error during categorization:', error);
+  }
+};
+
+const mergeContactsByEmail = (contacts: ProcessedContact[]): Record<string, ProcessedContact> => {
+  const merged: Record<string, ProcessedContact> = {};
+
+  contacts.forEach(contact => {
+    const existing = merged[contact.email];
+    
+    if (!existing) {
+      merged[contact.email] = { ...contact };
+    } else {
+      // Merge the data, combining arrays and preferring non-empty values
+      merged[contact.email] = {
+        email: contact.email,
+        name: contact.name || existing.name,
+        company: contact.company || existing.company,
+        summit_history: [...new Set([...existing.summit_history, ...contact.summit_history])],
+        engagement_level: contact.engagement_level || existing.engagement_level,
+        tags: [...new Set([...existing.tags, ...contact.tags])],
+        bucket: contact.bucket // Use the most recent bucket assignment
+      };
+    }
+  });
+
+  return merged;
+};
+
+const upsertContactWithMerging = async (contact: ProcessedContact): Promise<void> => {
+  // First, check if contact exists
+  const { data: existingContact, error: fetchError } = await supabase
+    .from('contacts')
+    .select('*')
+    .eq('email', contact.email)
+    .single();
+
+  if (fetchError && fetchError.code !== 'PGRST116') {
+    console.error('Error fetching existing contact:', fetchError);
+    throw fetchError;
+  }
+
+  let finalContact;
+
+  if (existingContact) {
+    // Merge with existing data
+    finalContact = {
+      email: contact.email,
+      full_name: contact.name || existingContact.full_name,
+      company: contact.company || existingContact.company,
+      summit_history: [...new Set([
+        ...(existingContact.summit_history || []),
+        ...contact.summit_history
+      ])],
+      engagement_level: contact.engagement_level || existingContact.engagement_level,
+      tags: [...new Set([
+        ...(existingContact.tags || []),
+        ...contact.tags
+      ])]
+    };
+    
+    console.log(`Updating existing contact: ${contact.email}`);
+  } else {
+    // New contact
+    finalContact = {
+      email: contact.email,
+      full_name: contact.name || null,
+      company: contact.company || null,
+      summit_history: contact.summit_history,
+      engagement_level: contact.engagement_level,
+      tags: contact.tags
+    };
+    
+    console.log(`Creating new contact: ${contact.email}`);
+  }
+
+  // Upsert the contact
+  const { error } = await supabase
+    .from('contacts')
+    .upsert(finalContact, { 
+      onConflict: 'email',
+      ignoreDuplicates: false 
+    });
+
+  if (error) {
+    console.error('Error upserting contact:', error);
+    throw error;
   }
 };
