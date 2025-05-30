@@ -13,6 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { uploadContacts } from "@/services/contactUploadService";
+import { processZipUpload } from "@/services/zipUploadService";
 import { FileUploadInput } from "@/components/FileUploadInput";
 import { UploadProgress } from "@/components/UploadProgress";
 import { BucketSelector } from "@/components/BucketSelector";
@@ -66,7 +67,7 @@ export const UploadDialog = ({ open, onOpenChange }: UploadDialogProps) => {
     if (!selectedFile) {
       toast({
         title: "Invalid file type",
-        description: "Please select a CSV file.",
+        description: "Please select a CSV or ZIP file.",
         variant: "destructive",
       });
       return;
@@ -81,32 +82,48 @@ export const UploadDialog = ({ open, onOpenChange }: UploadDialogProps) => {
     setProgress(0);
 
     try {
-      console.log('Reading file...');
-      const text = await file.text();
-      console.log('File content length:', text.length);
-      console.log('First 200 characters:', text.substring(0, 200));
+      console.log('Processing file:', file.name, 'Type:', file.type);
       
-      const contacts = parseCSV(text);
-      
-      if (contacts.length === 0) {
-        throw new Error("No valid contacts found in CSV file. Please ensure your CSV has an 'Email' column with valid email addresses.");
+      // Check if it's a ZIP file
+      if (file.name.endsWith('.zip') || file.type === 'application/zip') {
+        console.log('Processing ZIP file...');
+        
+        // Use ZIP upload service
+        await processZipUpload(file, setProgress);
+        
+        toast({
+          title: "ZIP upload successful",
+          description: "All contacts from the ZIP file have been processed and categorized.",
+        });
+      } else {
+        // Process as CSV file
+        console.log('Processing CSV file...');
+        const text = await file.text();
+        console.log('File content length:', text.length);
+        console.log('First 200 characters:', text.substring(0, 200));
+        
+        const contacts = parseCSV(text);
+        
+        if (contacts.length === 0) {
+          throw new Error("No valid contacts found in CSV file. Please ensure your CSV has an 'Email' column with valid email addresses.");
+        }
+
+        setProgress(10);
+        
+        await uploadContacts(contacts, selectedBucket, setProgress);
+
+        setProgress(100);
+        
+        toast({
+          title: "CSV upload successful",
+          description: `${contacts.length} contacts have been processed and added to the ${selectedBucket} bucket.`,
+        });
       }
-
-      setProgress(10);
-      
-      await uploadContacts(contacts, selectedBucket, setProgress);
-
-      setProgress(100);
       
       // Invalidate queries to refresh the UI
       queryClient.invalidateQueries({ queryKey: ["contacts"] });
       queryClient.invalidateQueries({ queryKey: ["contacts-count"] });
       queryClient.invalidateQueries({ queryKey: ["categories"] });
-      
-      toast({
-        title: "Upload successful",
-        description: `${contacts.length} contacts have been processed and added to the ${selectedBucket} bucket.`,
-      });
       
       setTimeout(() => {
         onOpenChange(false);
@@ -127,13 +144,15 @@ export const UploadDialog = ({ open, onOpenChange }: UploadDialogProps) => {
     }
   };
 
+  const isZipFile = file && (file.name.endsWith('.zip') || file.type === 'application/zip');
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Upload Customer Data</DialogTitle>
           <DialogDescription>
-            Upload a CSV file and select which main bucket the contacts should be placed in.
+            Upload a CSV file or ZIP file containing customer contacts.
           </DialogDescription>
         </DialogHeader>
 
@@ -141,7 +160,11 @@ export const UploadDialog = ({ open, onOpenChange }: UploadDialogProps) => {
           <Alert>
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              Ensure your CSV includes an 'Email' column. Supported columns: First Name, Email, Contact Tags, Company.
+              {isZipFile ? (
+                "ZIP files should be organized by buckets (Biz/Health/Survivalist), summits, and engagement levels (H-/L-/M-/U-)."
+              ) : (
+                "CSV files should include an 'Email' column. Supported columns: First Name, Email, Contact Tags, Company."
+              )}
             </AlertDescription>
           </Alert>
 
@@ -149,9 +172,10 @@ export const UploadDialog = ({ open, onOpenChange }: UploadDialogProps) => {
             file={file}
             onFileChange={handleFileChange}
             disabled={uploading}
+            acceptedTypes="both"
           />
 
-          {file && !uploading && (
+          {file && !uploading && !isZipFile && (
             <BucketSelector
               selectedBucket={selectedBucket}
               onBucketChange={(bucket) => setSelectedBucket(bucket as MainBucketId)}
@@ -174,7 +198,7 @@ export const UploadDialog = ({ open, onOpenChange }: UploadDialogProps) => {
               disabled={!file || uploading}
             >
               <Upload className="w-4 h-4 mr-2" />
-              {uploading ? "Uploading..." : "Upload & Process"}
+              {uploading ? "Processing..." : "Upload & Process"}
             </Button>
           </div>
         </div>
