@@ -26,6 +26,7 @@ export const runCategorizationWorkflow = async (
   }
 
   // Get ALL contacts that haven't been categorized yet (no limit)
+  console.log('Fetching uncategorized contacts...');
   const allContacts = await fetchUncategorizedContacts(contactIds);
 
   if (allContacts.length === 0) {

@@ -33,7 +33,7 @@ export const fetchUncategorizedContacts = async (contactIds?: string[], limit?: 
   const batchSize = 1000; // Supabase's effective limit
 
   while (hasMore && (!limit || allUncategorizedContacts.length < limit)) {
-    console.log(`Fetching batch starting at offset ${offset}`);
+    console.log(`Fetching batch starting at offset ${offset}, total fetched so far: ${allUncategorizedContacts.length}`);
     
     // Use a LEFT JOIN approach to find uncategorized contacts more efficiently
     const { data: contacts, error } = await supabase
@@ -47,7 +47,8 @@ export const fetchUncategorizedContacts = async (contactIds?: string[], limit?: 
         contact_categories!left (contact_id)
       `)
       .is('contact_categories.contact_id', null)
-      .range(offset, offset + batchSize - 1);
+      .range(offset, offset + batchSize - 1)
+      .order('created_at', { ascending: true }); // Add consistent ordering
 
     if (error) {
       console.error('Error fetching uncategorized contacts batch:', error);
@@ -55,6 +56,7 @@ export const fetchUncategorizedContacts = async (contactIds?: string[], limit?: 
     }
 
     if (!contacts || contacts.length === 0) {
+      console.log('No more contacts found, stopping fetch');
       hasMore = false;
       break;
     }
@@ -73,6 +75,7 @@ export const fetchUncategorizedContacts = async (contactIds?: string[], limit?: 
 
     // If we got less than the batch size, we've reached the end
     if (contacts.length < batchSize) {
+      console.log(`Got ${contacts.length} contacts (less than batch size ${batchSize}), stopping fetch`);
       hasMore = false;
     }
 
@@ -83,8 +86,13 @@ export const fetchUncategorizedContacts = async (contactIds?: string[], limit?: 
     }
 
     offset += batchSize;
+
+    // Add a small delay to avoid overwhelming Supabase
+    if (hasMore) {
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
   }
 
-  console.log(`Fetched ${allUncategorizedContacts.length} total uncategorized contacts${limit ? ` (limit was ${limit})` : ' (no limit)'}`);
+  console.log(`Finished fetching. Total uncategorized contacts: ${allUncategorizedContacts.length}${limit ? ` (limit was ${limit})` : ' (no limit)'}`);
   return allUncategorizedContacts;
 };
