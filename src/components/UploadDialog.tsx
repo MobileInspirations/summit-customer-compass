@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Upload, AlertCircle } from "lucide-react";
 import {
@@ -11,13 +12,41 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { parseCSV } from "@/utils/csvParser";
 import { uploadContacts } from "@/services/contactUploadService";
 import { FileUploadInput } from "@/components/FileUploadInput";
 import { UploadProgress } from "@/components/UploadProgress";
 import { BucketSelector } from "@/components/BucketSelector";
 import { useBucketCounts } from "@/hooks/useBucketCounts";
 import type { MainBucketId } from "@/services/bucketCategorizationService";
+
+// Simple CSV parser function for single file uploads
+const parseCSV = (csvContent: string) => {
+  const lines = csvContent.split('\n').filter(line => line.trim());
+  if (lines.length <= 1) return [];
+
+  const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+  const emailIndex = headers.findIndex(h => h.includes('email'));
+  
+  if (emailIndex === -1) {
+    throw new Error("CSV must contain an 'Email' column");
+  }
+
+  const contacts = [];
+  for (let i = 1; i < lines.length; i++) {
+    const values = lines[i].split(',').map(v => v.trim());
+    const email = values[emailIndex];
+    
+    if (email && email.includes('@')) {
+      contacts.push({
+        email,
+        full_name: values[headers.findIndex(h => h.includes('name'))] || '',
+        company: values[headers.findIndex(h => h.includes('company'))] || ''
+      });
+    }
+  }
+  
+  return contacts;
+};
 
 interface UploadDialogProps {
   open: boolean;
