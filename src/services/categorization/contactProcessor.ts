@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import type { ContactForCategorization, CategoryData } from "../types/contactTypes";
 import { shouldAssignToCategory } from "./categorizationLogic";
@@ -73,4 +72,17 @@ export const categorizeContact = async (
       console.log(`Assigned contact ${contact.email} to ${assignedCategories.length} categories`);
     }
   }
+};
+
+export const categorizeContactBatch = async (
+  contacts: ContactForCategorization[], 
+  categories: CategoryData[]
+): Promise<void> => {
+  console.log(`Processing batch of ${contacts.length} contacts`);
+  
+  for (const contact of contacts) {
+    await categorizeContact(contact, categories);
+  }
+  
+  console.log(`Completed batch of ${contacts.length} contacts`);
 };

@@ -7,27 +7,35 @@ export interface CategorizationProgress {
   totalCount: number;
 }
 
-export const createProgressUpdate = (
-  processedCount: number,
-  totalCount: number,
-  currentBatch: number,
-  totalBatches: number
-): CategorizationProgress => {
-  const progress = Math.round((processedCount / totalCount) * 100);
-  
-  return {
-    progress,
-    currentBatch,
-    totalBatches,
-    processedCount,
-    totalCount
-  };
-};
+export class ProgressTracker {
+  private onProgress?: (progress: CategorizationProgress) => void;
 
-export const createInitialProgress = (): CategorizationProgress => ({
-  progress: 0,
-  currentBatch: 0,
-  totalBatches: 0,
-  processedCount: 0,
-  totalCount: 0
-});
+  constructor(onProgress?: (progress: CategorizationProgress) => void) {
+    this.onProgress = onProgress;
+  }
+
+  initialize(totalCount: number): void {
+    if (this.onProgress) {
+      this.onProgress({
+        progress: 0,
+        currentBatch: 0,
+        totalBatches: 0,
+        processedCount: 0,
+        totalCount
+      });
+    }
+  }
+
+  updateProgress(processedCount: number, currentBatch: number, totalBatches: number): void {
+    if (this.onProgress) {
+      const progress = Math.round((processedCount / (totalBatches * 50)) * 100); // Assuming 50 per batch
+      this.onProgress({
+        progress,
+        currentBatch,
+        totalBatches,
+        processedCount,
+        totalCount: totalBatches * 50
+      });
+    }
+  }
+}

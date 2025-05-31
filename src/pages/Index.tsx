@@ -1,14 +1,16 @@
-import { useState, useRef } from "react";
+
+import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
 import { useCategoriesByType } from "@/hooks/useCategories";
 import { useContactsCount } from "@/hooks/useContacts";
 import { useBucketCounts } from "@/hooks/useBucketCounts";
-import { categorizeContacts, CancellationToken } from "@/services/contactCategorizationService";
-import { sortContacts } from "@/services/contactSortingService";
-import { exportAllTags } from "@/services/tagExportService";
 import { useAuth } from "@/hooks/useAuth";
+import { useCategorizationState } from "@/hooks/useCategorizationState";
+import { useExportState } from "@/hooks/useExportState";
+import { useDialogState } from "@/hooks/useDialogState";
+import { useCategorizationHandlers } from "@/components/Dashboard/CategorizationHandlers";
+import { useExportHandlers } from "@/components/Dashboard/ExportHandlers";
 import { EnhancedDashboardHeader } from "@/components/Dashboard/EnhancedDashboardHeader";
 import { StatsCards } from "@/components/Dashboard/StatsCards";
 import { CategoriesSection } from "@/components/Dashboard/CategoriesSection";
@@ -19,47 +21,23 @@ import { CategorizationProgress } from "@/components/CategorizationProgress";
 import { ExportProgress } from "@/components/ExportProgress";
 import { AICategorizationDialog } from "@/components/AICategorizationDialog";
 import { ContactLimitDialog } from "@/components/ContactLimitDialog";
-import type { MainBucketId } from "@/services/bucketCategorizationService";
 import { EmailCleaningProgress } from "@/components/EmailCleaningProgress";
 import { CategorizationResultsDialog } from "@/components/CategorizationResultsDialog";
-import type { CategorizationResults } from "@/services/contactCategorizationService";
+import type { MainBucketId } from "@/services/bucketCategorizationService";
 
 const Index = () => {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedBucket, setSelectedBucket] = useState<MainBucketId>('biz-op');
-  const [showUploadDialog, setShowUploadDialog] = useState(false);
-  const [showExportDialog, setShowExportDialog] = useState(false);
-  const [showContactLimitDialog, setShowContactLimitDialog] = useState(false);
-  const [isCategorizing, setIsCategorizing] = useState(false);
   const [isSorting, setIsSorting] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
-  const [categorizationProgress, setCategorizationProgress] = useState({
-    progress: 0,
-    currentBatch: 0,
-    totalBatches: 0,
-    processedCount: 0,
-    totalCount: 0
-  });
-  const [exportProgress, setExportProgress] = useState({
-    contactsProcessed: 0,
-    totalContacts: 0,
-    tagsFound: 0,
-    isComplete: false,
-    isError: false
-  });
-  const [emailCleaningProgress, setEmailCleaningProgress] = useState({
-    processed: 0,
-    total: 0,
-    validEmails: 0,
-    isActive: false,
-    isComplete: false,
-    isError: false
-  });
-  const cancellationTokenRef = useRef<CancellationToken | null>(null);
+  
   const { toast } = useToast();
   const { signOut } = useAuth();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
+
+  // Custom hooks for state management
+  const categorizationState = useCategorizationState();
+  const exportState = useExportState();
+  const dialogState = useDialogState();
 
   // Fetch data from Supabase
   const { data: customerCategories = [], isLoading: customerLoading } = useCategoriesByType("customer");
@@ -70,6 +48,23 @@ const Index = () => {
   const allCategories = [...customerCategories, ...personalityCategories];
   const isLoading = customerLoading || personalityLoading || contactsLoading || bucketCountsLoading;
 
+  // Event handlers
+  const categorizationHandlers = useCategorizationHandlers({
+    setIsCategorizing: categorizationState.setIsCategorizing,
+    setCategorizationProgress: categorizationState.setCategorizationProgress,
+    setCategorizationResults: categorizationState.setCategorizationResults,
+    setShowResultsDialog: categorizationState.setShowResultsDialog,
+    cancellationTokenRef: categorizationState.cancellationTokenRef,
+    resetProgress: categorizationState.resetProgress
+  });
+
+  const exportHandlers = useExportHandlers({
+    setIsExporting: exportState.setIsExporting,
+    setExportProgress: exportState.setExportProgress,
+    selectedCategories,
+    allCategories
+  });
+
   const handleCategorySelect = (categoryId: string) => {
     setSelectedCategories(prev => 
       prev.includes(categoryId) 
@@ -79,259 +74,14 @@ const Index = () => {
   };
 
   const handleExport = () => {
-    if (selectedCategories.length === 0) {
-      toast({
-        title: "No categories selected",
-        description: "Please select at least one category to export.",
-        variant: "destructive",
-      });
-      return;
-    }
-    setShowExportDialog(true);
-  };
-
-  const handleStopCategorization = () => {
-    if (cancellationTokenRef.current) {
-      cancellationTokenRef.current.cancel();
-      setIsCategorizing(false);
-      toast({
-        title: "Categorization stopped",
-        description: "The categorization process has been cancelled.",
-        variant: "default",
-      });
+    const canExport = exportHandlers.handleExport();
+    if (canExport) {
+      dialogState.setShowExportDialog(true);
     }
   };
 
   const handleViewAllContacts = () => {
     navigate("/contacts");
-  };
-
-  const selectedCount = allCategories
-    .filter(cat => selectedCategories.includes(cat.id))
-    .reduce((sum, cat) => sum + cat.count, 0);
-
-  const handleEmailCleaningProgress = (processed: number, total: number, validEmails: number) => {
-    setEmailCleaningProgress({
-      processed,
-      total,
-      validEmails,
-      isActive: true,
-      isComplete: false,
-      isError: false
-    });
-  };
-
-  const [showAICategorizationDialog, setShowAICategorizationDialog] = useState(false);
-  
-  const [categorizationResults, setCategorizationResults] = useState<CategorizationResults | null>(null);
-  const [showResultsDialog, setShowResultsDialog] = useState(false);
-
-  // Regular rule-based categorization (NO AI, NO API KEY REQUIRED)
-  const handleCategorizeAll = () => {
-    setShowContactLimitDialog(true);
-  };
-
-  const handleContactLimitCategorization = async (contactLimit?: number) => {
-    setIsCategorizing(true);
-    setCategorizationProgress({
-      progress: 0,
-      currentBatch: 0,
-      totalBatches: 0,
-      processedCount: 0,
-      totalCount: 0
-    });
-
-    // Create a new cancellation token
-    cancellationTokenRef.current = new CancellationToken();
-
-    try {
-      // Call categorizeContacts with useAI = false and no API key
-      const results = await categorizeContacts(
-        undefined, // contactIds
-        (progress) => {
-          setCategorizationProgress(progress);
-        }, 
-        false, // useAI = false for regular categorization
-        undefined, // no API key needed
-        cancellationTokenRef.current,
-        contactLimit // pass the contact limit
-      );
-      
-      queryClient.invalidateQueries({ queryKey: ["categories"] });
-      
-      // Store results and show dialog
-      setCategorizationResults(results);
-      setShowResultsDialog(true);
-      
-      toast({
-        title: "Categorization complete",
-        description: `Contacts have been automatically categorized into appropriate buckets${contactLimit ? ` (limited to ${contactLimit} contacts)` : ''}.`,
-      });
-    } catch (error) {
-      if (error instanceof Error && error.message === 'Operation was cancelled') {
-        // Don't show error toast for user-initiated cancellation
-        return;
-      }
-      console.error('Categorization error:', error);
-      toast({
-        title: "Categorization failed",
-        description: "Please try again or contact support.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsCategorizing(false);
-      cancellationTokenRef.current = null;
-      setTimeout(() => {
-        setCategorizationProgress({
-          progress: 0,
-          currentBatch: 0,
-          totalBatches: 0,
-          processedCount: 0,
-          totalCount: 0
-        });
-      }, 2000);
-    }
-  };
-
-  // AI-based categorization (USES STORED API KEY FROM SUPABASE)
-  const handleAICategorizeAll = async (contactLimit?: number) => {
-    setIsCategorizing(true);
-    setCategorizationProgress({
-      progress: 0,
-      currentBatch: 0,
-      totalBatches: 0,
-      processedCount: 0,
-      totalCount: 0
-    });
-
-    // Create a new cancellation token
-    cancellationTokenRef.current = new CancellationToken();
-
-    try {
-      // Call categorizeContacts with useAI = true (API key will be retrieved from Supabase)
-      const results = await categorizeContacts(
-        undefined, // contactIds
-        (progress) => {
-          setCategorizationProgress(progress);
-        }, 
-        true, // useAI = true for AI categorization
-        undefined, // API key will be retrieved from Supabase secrets
-        cancellationTokenRef.current,
-        contactLimit // pass the contact limit
-      );
-      
-      queryClient.invalidateQueries({ queryKey: ["categories"] });
-      
-      // Store results and show dialog
-      setCategorizationResults(results);
-      setShowResultsDialog(true);
-      
-      toast({
-        title: "AI Categorization complete",
-        description: `Contacts have been categorized using AI into personality type buckets${contactLimit ? ` (limited to ${contactLimit} contacts)` : ''}.`,
-      });
-    } catch (error) {
-      if (error instanceof Error && error.message === 'Operation was cancelled') {
-        // Don't show error toast for user-initiated cancellation
-        return;
-      }
-      console.error('AI Categorization error:', error);
-      toast({
-        title: "AI Categorization failed",
-        description: "Please check your API key configuration in Supabase and try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsCategorizing(false);
-      cancellationTokenRef.current = null;
-      setTimeout(() => {
-        setCategorizationProgress({
-          progress: 0,
-          currentBatch: 0,
-          totalBatches: 0,
-          processedCount: 0,
-          totalCount: 0
-        });
-      }, 2000);
-    }
-  };
-
-  const handleSortContacts = async () => {
-    setIsSorting(true);
-    try {
-      await sortContacts('name', 'asc');
-      queryClient.invalidateQueries({ queryKey: ["contacts"] });
-      queryClient.invalidateQueries({ queryKey: ["contacts-count"] });
-      toast({
-        title: "Contacts sorted",
-        description: "All contacts have been sorted alphabetically by name.",
-      });
-    } catch (error) {
-      console.error('Sorting error:', error);
-      toast({
-        title: "Sorting failed",
-        description: "Please try again or contact support.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSorting(false);
-    }
-  };
-
-  const handleExportAllTags = async () => {
-    setIsExporting(true);
-    setExportProgress({
-      contactsProcessed: 0,
-      totalContacts: 0,
-      tagsFound: 0,
-      isComplete: false,
-      isError: false
-    });
-
-    try {
-      const exportedCategories = await exportAllTags((progress) => {
-        setExportProgress(prev => ({
-          ...prev,
-          contactsProcessed: progress.contactsProcessed,
-          totalContacts: progress.totalContacts,
-          tagsFound: progress.tagsFound
-        }));
-      });
-      
-      setExportProgress(prev => ({
-        ...prev,
-        isComplete: true,
-        isError: false
-      }));
-      
-      toast({
-        title: "Export complete",
-        description: `Successfully exported ${exportedCategories.length} categories/tags to CSV file.`,
-      });
-    } catch (error) {
-      console.error('Export error:', error);
-      setExportProgress(prev => ({
-        ...prev,
-        isComplete: true,
-        isError: true
-      }));
-      toast({
-        title: "Export failed",
-        description: "Please try again or contact support.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsExporting(false);
-      setTimeout(() => {
-        setExportProgress({
-          contactsProcessed: 0,
-          totalContacts: 0,
-          tagsFound: 0,
-          isComplete: false,
-          isError: false
-        });
-      }, 3000);
-    }
   };
 
   const handleSignOut = async () => {
@@ -342,21 +92,25 @@ const Index = () => {
     });
   };
 
+  const selectedCount = allCategories
+    .filter(cat => selectedCategories.includes(cat.id))
+    .reduce((sum, cat) => sum + cat.count, 0);
+
   return (
     <div className="min-h-screen bg-gray-50">
       <EnhancedDashboardHeader
-        onUploadClick={() => setShowUploadDialog(true)}
+        onUploadClick={() => dialogState.setShowUploadDialog(true)}
         onViewAllContacts={handleViewAllContacts}
-        onSortContacts={handleSortContacts}
-        onExportAllTags={handleExportAllTags}
-        onCategorizeAll={handleCategorizeAll}
-        onAICategorizeAll={() => setShowAICategorizationDialog(true)}
+        onSortContacts={exportHandlers.handleSortContacts}
+        onExportAllTags={exportHandlers.handleExportAllTags}
+        onCategorizeAll={() => dialogState.setShowContactLimitDialog(true)}
+        onAICategorizeAll={() => dialogState.setShowAICategorizationDialog(true)}
         onExport={handleExport}
         onSignOut={handleSignOut}
         selectedCategoriesCount={selectedCategories.length}
         isSorting={isSorting}
-        isExporting={isExporting}
-        isCategorizing={isCategorizing}
+        isExporting={exportState.isExporting}
+        isCategorizing={categorizationState.isCategorizing}
       />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -387,62 +141,63 @@ const Index = () => {
         />
       </div>
 
+      {/* Dialogs */}
       <UploadDialog 
-        open={showUploadDialog} 
-        onOpenChange={setShowUploadDialog} 
+        open={dialogState.showUploadDialog} 
+        onOpenChange={dialogState.setShowUploadDialog} 
       />
       <ExportDialog 
-        open={showExportDialog} 
-        onOpenChange={setShowExportDialog}
+        open={dialogState.showExportDialog} 
+        onOpenChange={dialogState.setShowExportDialog}
         selectedCategories={selectedCategories.map(id => 
           allCategories.find(cat => cat.id === id)!
         ).filter(Boolean)}
-        onEmailCleaningProgress={handleEmailCleaningProgress}
+        onEmailCleaningProgress={exportState.handleEmailCleaningProgress}
       />
       <AICategorizationDialog
-        open={showAICategorizationDialog}
-        onOpenChange={setShowAICategorizationDialog}
-        onCategorize={handleAICategorizeAll}
+        open={dialogState.showAICategorizationDialog}
+        onOpenChange={dialogState.setShowAICategorizationDialog}
+        onCategorize={categorizationHandlers.handleAICategorizeAll}
       />
       <ContactLimitDialog
-        open={showContactLimitDialog}
-        onOpenChange={setShowContactLimitDialog}
-        onCategorize={handleContactLimitCategorization}
+        open={dialogState.showContactLimitDialog}
+        onOpenChange={dialogState.setShowContactLimitDialog}
+        onCategorize={categorizationHandlers.handleContactLimitCategorization}
         title="Auto Categorization"
         description="Select how many contacts to categorize using rule-based logic."
       />
+      <CategorizationResultsDialog
+        open={categorizationState.showResultsDialog}
+        onOpenChange={categorizationState.setShowResultsDialog}
+        results={categorizationState.categorizationResults}
+      />
+
+      {/* Progress Components */}
       <CategorizationProgress
-        isVisible={isCategorizing}
-        progress={categorizationProgress.progress}
-        currentBatch={categorizationProgress.currentBatch}
-        totalBatches={categorizationProgress.totalBatches}
-        processedCount={categorizationProgress.processedCount}
-        totalCount={categorizationProgress.totalCount}
-        onStop={isCategorizing ? handleStopCategorization : undefined}
+        isVisible={categorizationState.isCategorizing}
+        progress={categorizationState.categorizationProgress.progress}
+        currentBatch={categorizationState.categorizationProgress.currentBatch}
+        totalBatches={categorizationState.categorizationProgress.totalBatches}
+        processedCount={categorizationState.categorizationProgress.processedCount}
+        totalCount={categorizationState.categorizationProgress.totalCount}
+        onStop={categorizationState.isCategorizing ? categorizationHandlers.handleStopCategorization : undefined}
       />
       <ExportProgress
-        isVisible={isExporting || exportProgress.isComplete}
-        isComplete={exportProgress.isComplete}
-        isError={exportProgress.isError}
-        contactsProcessed={exportProgress.contactsProcessed}
-        totalContacts={exportProgress.totalContacts}
-        tagsFound={exportProgress.tagsFound}
+        isVisible={exportState.isExporting || exportState.exportProgress.isComplete}
+        isComplete={exportState.exportProgress.isComplete}
+        isError={exportState.exportProgress.isError}
+        contactsProcessed={exportState.exportProgress.contactsProcessed}
+        totalContacts={exportState.exportProgress.totalContacts}
+        tagsFound={exportState.exportProgress.tagsFound}
       />
       <EmailCleaningProgress
-        isVisible={emailCleaningProgress.isActive}
-        isComplete={emailCleaningProgress.isComplete}
-        isError={emailCleaningProgress.isError}
-        processed={emailCleaningProgress.processed}
-        total={emailCleaningProgress.total}
-        validEmails={emailCleaningProgress.validEmails}
+        isVisible={exportState.emailCleaningProgress.isActive}
+        isComplete={exportState.emailCleaningProgress.isComplete}
+        isError={exportState.emailCleaningProgress.isError}
+        processed={exportState.emailCleaningProgress.processed}
+        total={exportState.emailCleaningProgress.total}
+        validEmails={exportState.emailCleaningProgress.validEmails}
       />
-      
-      <CategorizationResultsDialog
-        open={showResultsDialog}
-        onOpenChange={setShowResultsDialog}
-        results={categorizationResults}
-      />
-      
     </div>
   );
 };
