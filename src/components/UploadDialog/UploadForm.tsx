@@ -56,10 +56,11 @@ const parseCSV = (csvContent: string) => {
 
 interface UploadFormProps {
   onClose: () => void;
+  onUploadComplete: () => void;
   bucketCounts: Record<string, number>;
 }
 
-export const UploadForm = ({ onClose, bucketCounts }: UploadFormProps) => {
+export const UploadForm = ({ onClose, onUploadComplete, bucketCounts }: UploadFormProps) => {
   const [file, setFile] = useState<File | null>(null);
   const [selectedBucket, setSelectedBucket] = useState<MainBucketId>('biz-op');
   const [uploading, setUploading] = useState(false);
@@ -131,7 +132,7 @@ export const UploadForm = ({ onClose, bucketCounts }: UploadFormProps) => {
       queryClient.invalidateQueries({ queryKey: ["categories"] });
       
       setTimeout(() => {
-        onClose();
+        onUploadComplete();
         setFile(null);
         setUploading(false);
         setProgress(0);
