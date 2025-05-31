@@ -8,6 +8,8 @@ export const categorizeContact = async (
   categories: CategoryData[]
 ): Promise<void> => {
   console.log(`=== Categorizing contact: ${contact.email} ===`);
+  console.log(`Contact tags:`, contact.tags);
+  console.log(`Contact summit_history:`, contact.summit_history);
   
   const assignedCategories: string[] = [];
 
@@ -17,6 +19,8 @@ export const categorizeContact = async (
       id: contact.id,
       tags: contact.tags || contact.summit_history || []
     };
+
+    console.log(`Prepared contact for rules:`, contactForRules);
 
     const mandatoryResult = categorizeContactMandatoryBuckets(contactForRules);
     console.log(`Mandatory categorization for ${contact.email}: Main=${mandatoryResult.mainBucket}, Personality=${mandatoryResult.personalityBucket}`);
@@ -29,11 +33,22 @@ export const categorizeContact = async (
       cat.name === mandatoryResult.personalityBucket && cat.category_type === 'personality'
     );
 
+    console.log(`Found main bucket category:`, mainBucketCategory);
+    console.log(`Found personality bucket category:`, personalityBucketCategory);
+
     if (mainBucketCategory) {
       assignedCategories.push(mainBucketCategory.id);
       console.log(`Assigned to main bucket: ${mainBucketCategory.name}`);
     } else {
       console.warn(`Main bucket category not found: ${mandatoryResult.mainBucket}`);
+      // Try to find "Cannot Place" as fallback
+      const cannotPlaceCategory = categories.find(cat => 
+        cat.name === 'Cannot Place' && cat.category_type === 'customer'
+      );
+      if (cannotPlaceCategory) {
+        assignedCategories.push(cannotPlaceCategory.id);
+        console.log(`Assigned to Cannot Place fallback`);
+      }
     }
 
     if (personalityBucketCategory) {
@@ -41,14 +56,13 @@ export const categorizeContact = async (
       console.log(`Assigned to personality bucket: ${personalityBucketCategory.name}`);
     } else {
       console.warn(`Personality bucket category not found: ${mandatoryResult.personalityBucket}`);
-    }
-
-    // If we still don't have categories, assign to "Cannot Place"
-    if (assignedCategories.length === 0) {
-      const cannotPlaceCategory = categories.find(cat => cat.name === 'Cannot Place');
-      if (cannotPlaceCategory) {
-        assignedCategories.push(cannotPlaceCategory.id);
-        console.log(`Assigned contact ${contact.email} to "Cannot Place" category as fallback`);
+      // Try to find a default personality category
+      const defaultPersonalityCategory = categories.find(cat => 
+        cat.name === 'Entrepreneurship & Business Development' && cat.category_type === 'personality'
+      );
+      if (defaultPersonalityCategory) {
+        assignedCategories.push(defaultPersonalityCategory.id);
+        console.log(`Assigned to default personality category`);
       }
     }
 
@@ -56,6 +70,17 @@ export const categorizeContact = async (
     if (assignedCategories.length > 0) {
       console.log(`Inserting ${assignedCategories.length} contact-category relationships for ${contact.email}`);
       
+      // First, remove any existing categorizations for this contact
+      const { error: deleteError } = await supabase
+        .from('contact_categories')
+        .delete()
+        .eq('contact_id', contact.id);
+
+      if (deleteError) {
+        console.error(`Error removing existing categories for ${contact.email}:`, deleteError);
+      }
+
+      // Then insert the new categorizations
       const contactCategoryRecords = assignedCategories.map(categoryId => ({
         contact_id: contact.id,
         category_id: categoryId
@@ -63,10 +88,7 @@ export const categorizeContact = async (
 
       const { error } = await supabase
         .from('contact_categories')
-        .upsert(contactCategoryRecords, { 
-          onConflict: 'contact_id,category_id',
-          ignoreDuplicates: true 
-        });
+        .insert(contactCategoryRecords);
 
       if (error) {
         console.error(`Error categorizing contact ${contact.email}:`, error);
