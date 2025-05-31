@@ -34,8 +34,8 @@ export const uploadContactsInBatches = async (
     const contactsToUpload = Object.values(mergedContacts);
     console.log(`After merging: ${contactsToUpload.length} unique contacts`);
 
-    // Upload in batches of 100
-    const batchSize = 100;
+    // Upload in larger batches of 1000 for better performance
+    const batchSize = 1000;
     const uploadedEmails: string[] = [];
 
     console.log(`Starting batch upload with batch size: ${batchSize}`);
@@ -43,23 +43,31 @@ export const uploadContactsInBatches = async (
       const batch = contactsToUpload.slice(i, i + batchSize);
       console.log(`Processing batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(contactsToUpload.length / batchSize)} (${batch.length} contacts)`);
       
-      // Process each contact individually to handle updates properly
-      for (let j = 0; j < batch.length; j++) {
-        const contact = batch[j];
-        try {
-          console.log(`Upserting contact ${j + 1}/${batch.length}: ${contact.email}`);
-          await upsertContactWithProperMerging(contact);
-          uploadedEmails.push(contact.email);
-          totalProcessed++;
+      try {
+        await upsertContactBatch(batch);
+        uploadedEmails.push(...batch.map(c => c.email));
+        totalProcessed += batch.length;
 
-          // Update progress more frequently
-          const progress = 50 + (totalProcessed / totalContacts) * 30;
-          onProgress(Math.round(progress));
-          console.log(`Progress: ${Math.round(progress)}% (${totalProcessed}/${totalContacts})`);
-        } catch (error) {
-          console.error(`Error upserting contact ${contact.email}:`, error);
-          // Continue with other contacts even if one fails
+        // Update progress
+        const progress = 50 + (totalProcessed / totalContacts) * 30;
+        onProgress(Math.round(progress));
+        console.log(`Progress: ${Math.round(progress)}% (${totalProcessed}/${totalContacts})`);
+      } catch (error) {
+        console.error(`Error upserting batch ${Math.floor(i / batchSize) + 1}:`, error);
+        // Try individual fallback for this batch
+        console.log('Falling back to individual processing for this batch...');
+        for (const contact of batch) {
+          try {
+            await upsertContactWithProperMerging(contact);
+            uploadedEmails.push(contact.email);
+            totalProcessed++;
+          } catch (individualError) {
+            console.error(`Error upserting contact ${contact.email}:`, individualError);
+          }
         }
+        
+        const progress = 50 + (totalProcessed / totalContacts) * 30;
+        onProgress(Math.round(progress));
       }
 
       console.log(`Completed batch ${Math.floor(i / batchSize) + 1}, total processed: ${totalProcessed}`);
@@ -90,6 +98,73 @@ export const uploadContactsInBatches = async (
   }
   
   console.log('=== uploadContactsInBatches completed ===');
+};
+
+const upsertContactBatch = async (contacts: ProcessedContact[]): Promise<void> => {
+  console.log(`Batch upserting ${contacts.length} contacts...`);
+  
+  // First, fetch existing contacts to determine merge strategy
+  const emails = contacts.map(c => c.email);
+  const { data: existingContacts, error: fetchError } = await supabase
+    .from('contacts')
+    .select('*')
+    .in('email', emails);
+
+  if (fetchError) {
+    console.error('Error fetching existing contacts:', fetchError);
+    throw fetchError;
+  }
+
+  const existingContactsMap = new Map(
+    (existingContacts || []).map(contact => [contact.email, contact])
+  );
+
+  // Prepare contacts for upsert with proper merging
+  const contactsToUpsert = contacts.map(contact => {
+    const existingContact = existingContactsMap.get(contact.email);
+    
+    if (existingContact) {
+      // Merge with existing data
+      const existingSummitHistory = existingContact.summit_history || [];
+      const existingTags = existingContact.tags || [];
+      
+      return {
+        email: contact.email,
+        full_name: contact.name || existingContact.full_name,
+        company: contact.company || existingContact.company,
+        summit_history: [...new Set([...existingSummitHistory, ...contact.summit_history])],
+        engagement_level: contact.engagement_level || existingContact.engagement_level,
+        tags: [...new Set([...existingTags, ...contact.tags])]
+      };
+    } else {
+      // New contact
+      return {
+        email: contact.email,
+        full_name: contact.name || null,
+        company: contact.company || null,
+        summit_history: contact.summit_history,
+        engagement_level: contact.engagement_level,
+        tags: contact.tags
+      };
+    }
+  });
+
+  console.log(`Upserting ${contactsToUpsert.length} contacts in batch...`);
+
+  // Perform batch upsert
+  const { error } = await supabase
+    .from('contacts')
+    .upsert(contactsToUpsert, { 
+      onConflict: 'email',
+      ignoreDuplicates: false 
+    });
+
+  if (error) {
+    console.error('Error in batch upsert:', error);
+    throw error;
+  }
+
+  console.log(`Successfully batch upserted ${contactsToUpsert.length} contacts`);
 };
 
 const upsertContactWithProperMerging = async (contact: ProcessedContact): Promise<void> => {
