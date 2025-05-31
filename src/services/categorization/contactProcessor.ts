@@ -2,6 +2,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { ContactForCategorization, CategoryData } from "../types/contactTypes";
 import { shouldAssignToCategory } from "./categorizationLogic";
+import { categorizeContactMandatoryBuckets, type ContactForRuleCategorization } from "../ruleBasedCategorizationService";
 
 export const categorizeContact = async (
   contact: ContactForCategorization, 
@@ -9,57 +10,46 @@ export const categorizeContact = async (
 ): Promise<void> => {
   const assignedCategories: string[] = [];
 
-  // First, try to assign to main buckets (Business Operations, Health, Survivalist)
-  const mainBuckets = categories.filter(cat => 
-    cat.name === 'Business Operations' || 
-    cat.name === 'Health' || 
-    cat.name === 'Survivalist'
-  );
+  // First, apply rule-based mandatory bucket categorization
+  const contactForRules: ContactForRuleCategorization = {
+    id: contact.id,
+    tags: contact.summit_history || contact.tags || []
+  };
 
-  for (const category of mainBuckets) {
+  const mandatoryResult = categorizeContactMandatoryBuckets(contactForRules);
+  console.log(`Rule-based categorization for ${contact.email}: Main=${mandatoryResult.mainBucket}, Personality=${mandatoryResult.personalityBucket}`);
+
+  // Find matching categories for the mandatory buckets
+  const mainBucketCategory = categories.find(cat => cat.name === mandatoryResult.mainBucket);
+  const personalityBucketCategory = categories.find(cat => cat.name === mandatoryResult.personalityBucket);
+
+  if (mainBucketCategory) {
+    assignedCategories.push(mainBucketCategory.id);
+  }
+  if (personalityBucketCategory) {
+    assignedCategories.push(personalityBucketCategory.id);
+  }
+
+  // Then apply the existing logic-based categorization for additional categories
+  for (const category of categories) {
+    // Skip if already assigned via mandatory categorization
+    if (assignedCategories.includes(category.id)) {
+      continue;
+    }
+
     if (shouldAssignToCategory(contact, category)) {
       assignedCategories.push(category.id);
     }
   }
 
-  // If assigned to main buckets, also check for other customer categories
-  if (assignedCategories.length > 0) {
-    const otherCategories = categories.filter(cat => 
-      cat.name !== 'Business Operations' && 
-      cat.name !== 'Health' && 
-      cat.name !== 'Survivalist' &&
-      cat.name !== 'Cannot Place'
-    );
-
-    for (const category of otherCategories) {
-      if (shouldAssignToCategory(contact, category)) {
-        assignedCategories.push(category.id);
-      }
-    }
-  } else {
-    // If no main bucket matched, try all other categories except "Cannot Place"
-    const otherCategories = categories.filter(cat => 
-      cat.name !== 'Business Operations' && 
-      cat.name !== 'Health' && 
-      cat.name !== 'Survivalist' &&
-      cat.name !== 'Cannot Place'
-    );
-
-    for (const category of otherCategories) {
-      if (shouldAssignToCategory(contact, category)) {
-        assignedCategories.push(category.id);
-      }
-    }
-
-    // If still no categories matched, assign to "Cannot Place" category
-    if (assignedCategories.length === 0) {
-      const cannotPlaceCategory = categories.find(cat => cat.name === 'Cannot Place');
-      if (cannotPlaceCategory) {
-        assignedCategories.push(cannotPlaceCategory.id);
-        console.log(`Assigned contact ${contact.email} to "Cannot Place" category`);
-      } else {
-        console.log(`No categories matched for contact: ${contact.email} and no "Cannot Place" category found`);
-      }
+  // If no categories were assigned at all, assign to "Cannot Place" category
+  if (assignedCategories.length === 0) {
+    const cannotPlaceCategory = categories.find(cat => cat.name === 'Cannot Place');
+    if (cannotPlaceCategory) {
+      assignedCategories.push(cannotPlaceCategory.id);
+      console.log(`Assigned contact ${contact.email} to "Cannot Place" category`);
+    } else {
+      console.log(`No categories matched for contact: ${contact.email} and no "Cannot Place" category found`);
     }
   }
 
@@ -82,8 +72,5 @@ export const categorizeContact = async (
     } else {
       console.log(`Assigned contact ${contact.email} to ${assignedCategories.length} categories`);
     }
-  } else {
-    // This should rarely happen now since we have the "Cannot Place" fallback
-    console.log(`No categories matched for contact: ${contact.email}`);
   }
 };
