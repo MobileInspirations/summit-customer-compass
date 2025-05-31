@@ -2,16 +2,18 @@
 import { ensureMainBucketsExist } from "./bucketCategorizationService";
 import { extractZipFiles } from "./zip/zipExtractor";
 import { processZipStructure } from "./zip/csvProcessor";
-import { groupContactsByBucket } from "./zip/contactMerger";
-import { uploadContactsInBatches } from "./zip/contactUploader";
+import { uploadContactsToSelectedBucket } from "./zip/contactUploader";
+import type { MainBucketId } from "./bucketCategorizationService";
 
 export const processZipUpload = async (
   zipFile: File,
+  selectedBucket: MainBucketId,
   onProgress: (progress: number) => void
 ): Promise<void> => {
   try {
     console.log('=== Starting ZIP file processing ===');
     console.log(`ZIP file: ${zipFile.name}, Size: ${zipFile.size} bytes`);
+    console.log(`Selected bucket: ${selectedBucket}`);
     onProgress(5);
 
     // Ensure main buckets exist
@@ -25,7 +27,7 @@ export const processZipUpload = async (
     console.log(`Extracted ${files.length} files from ZIP`);
     onProgress(20);
 
-    // Process all CSV files and organize contacts
+    // Process all CSV files and organize contacts (ignore folder structure for bucket assignment)
     console.log('Processing ZIP structure...');
     const allContacts = await processZipStructure(files);
     console.log(`Processed ${allContacts.length} contacts from ZIP`);
@@ -37,29 +39,21 @@ export const processZipUpload = async (
       return;
     }
 
-    console.log(`Processing ${allContacts.length} contacts from zip file`);
+    console.log(`Processing ${allContacts.length} contacts for ${selectedBucket} bucket`);
 
-    // Group contacts by bucket for efficient processing
-    console.log('Grouping contacts by bucket...');
-    const contactsByBucket = groupContactsByBucket(allContacts);
-    console.log('Contacts grouped by bucket:', Object.keys(contactsByBucket).map(bucket => 
-      `${bucket}: ${contactsByBucket[bucket as keyof typeof contactsByBucket].length}`
-    ));
-    onProgress(50);
-
-    // Upload contacts and assign to main buckets only (no categorization)
-    console.log('=== Starting batch upload phase (main bucket assignment only) ===');
+    // Upload all contacts to the manually selected bucket
+    console.log('=== Starting upload to selected bucket ===');
     try {
-      await uploadContactsInBatches(contactsByBucket, onProgress);
-      console.log('Batch upload completed successfully');
+      await uploadContactsToSelectedBucket(allContacts, selectedBucket, onProgress);
+      console.log('Upload completed successfully');
     } catch (uploadError) {
-      console.error('Error during batch upload:', uploadError);
+      console.error('Error during upload:', uploadError);
       throw new Error(`Failed during contact upload: ${uploadError.message}`);
     }
     
     onProgress(100);
     console.log('=== ZIP file processing completed successfully ===');
-    console.log('Note: Contacts have been uploaded and assigned to main buckets only. No automatic categorization was performed.');
+    console.log(`All contacts have been uploaded to ${selectedBucket} bucket`);
   } catch (error) {
     console.error('=== ERROR during ZIP processing ===', error);
     throw error;

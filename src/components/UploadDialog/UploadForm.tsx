@@ -72,17 +72,18 @@ export const UploadForm = ({ onClose, bucketCounts }: UploadFormProps) => {
 
     try {
       console.log('Processing file:', file.name, 'Type:', file.type);
+      console.log('Selected bucket:', selectedBucket);
       
       // Check if it's a ZIP file
       if (file.name.endsWith('.zip') || file.type === 'application/zip') {
         console.log('Processing ZIP file...');
         
-        // Use ZIP upload service
-        await processZipUpload(file, setProgress);
+        // Use ZIP upload service with selected bucket
+        await processZipUpload(file, selectedBucket, setProgress);
         
         toast({
           title: "ZIP upload successful",
-          description: "All contacts from the ZIP file have been processed and categorized.",
+          description: `All contacts from the ZIP file have been added to the ${selectedBucket} bucket.`,
         });
       } else {
         // Process as CSV file

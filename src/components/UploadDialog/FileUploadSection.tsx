@@ -30,7 +30,7 @@ export const FileUploadSection = ({
         <AlertCircle className="h-4 w-4" />
         <AlertDescription>
           {isZipFile ? (
-            "ZIP files should be organized by buckets (Biz/Health/Survivalist), summits, and engagement levels (H-/L-/M-/U-)."
+            "ZIP files can contain multiple CSV files organized in folders. All contacts will be added to the selected bucket below."
           ) : (
             "CSV files should include an 'Email' column. Supported columns: First Name, Email, Contact Tags, Company."
           )}
@@ -44,7 +44,7 @@ export const FileUploadSection = ({
         acceptedTypes="both"
       />
 
-      {file && !uploading && !isZipFile && (
+      {file && !uploading && (
         <BucketSelector
           selectedBucket={selectedBucket}
           onBucketChange={(bucket) => onBucketChange(bucket as MainBucketId)}
