@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useContacts } from "@/hooks/useContacts";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -63,35 +62,31 @@ const ContactsTable = () => {
 
   const getMainBucketLabel = (bucket?: string) => {
     console.log('Raw bucket value:', bucket); // Debug log
-    switch (bucket) {
-      case 'biz-op':
-      case 'Business Operations':
-        return 'Business Operations';
-      case 'health':
-      case 'Health':
-        return 'Health';
-      case 'survivalist':
-      case 'Survivalist':
-        return 'Survivalist';
-      default:
-        console.warn('Unknown bucket value:', bucket); // Debug log
-        return bucket || 'Unknown';
+    // Normalize all business operations variants
+    if (bucket === 'biz-op' || bucket === 'biz' || bucket === 'Business Operations' || bucket === 'business operations') {
+      return 'Business Operations';
+    } else if (bucket === 'health' || bucket === 'Health') {
+      return 'Health';
+    } else if (bucket === 'survivalist' || bucket === 'Survivalist') {
+      return 'Survivalist';
+    } else if (bucket === 'cannot-place' || bucket === 'Cannot Place') {
+      return 'Cannot Place';
+    } else {
+      console.warn('Unknown bucket value:', bucket); // Debug log
+      return bucket || 'Unknown';
     }
   };
 
   const getMainBucketVariant = (bucket?: string) => {
-    switch (bucket) {
-      case 'biz-op':
-      case 'Business Operations':
-        return 'default';
-      case 'health':
-      case 'Health':
-        return 'secondary';
-      case 'survivalist':
-      case 'Survivalist':
-        return 'outline';
-      default:
-        return 'outline';
+    // Normalize all business operations variants
+    if (bucket === 'biz-op' || bucket === 'biz' || bucket === 'Business Operations' || bucket === 'business operations') {
+      return 'default';
+    } else if (bucket === 'health' || bucket === 'Health') {
+      return 'secondary';
+    } else if (bucket === 'survivalist' || bucket === 'Survivalist') {
+      return 'outline';
+    } else {
+      return 'outline';
     }
   };
 

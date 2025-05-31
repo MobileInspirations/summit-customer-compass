@@ -21,7 +21,7 @@ export const useBucketCounts = () => {
       console.log('Total contacts fetched for bucket counting:', allContacts?.length);
       console.log('Sample contact main_bucket values:', allContacts?.slice(0, 10).map(c => c.main_bucket));
 
-      // Count contacts by main_bucket
+      // Count contacts by main_bucket with proper normalization
       const bucketCounts: Record<string, number> = {
         'biz-op': 0,
         'health': 0,
@@ -33,7 +33,8 @@ export const useBucketCounts = () => {
         const bucket = contact.main_bucket;
         console.log('Processing contact with bucket:', bucket);
         
-        if (bucket === 'biz-op' || bucket === 'Business Operations') {
+        // Normalize all business operations variants to 'biz-op'
+        if (bucket === 'biz-op' || bucket === 'biz' || bucket === 'Business Operations' || bucket === 'business operations') {
           bucketCounts['biz-op']++;
         } else if (bucket === 'health' || bucket === 'Health') {
           bucketCounts['health']++;
@@ -43,6 +44,8 @@ export const useBucketCounts = () => {
           bucketCounts['cannot-place']++;
         } else {
           console.warn('Unknown bucket value found:', bucket);
+          // Default unknown buckets to biz-op since most uploads are business operations
+          bucketCounts['biz-op']++;
         }
       });
 
