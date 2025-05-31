@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { ensureMainBucketsExist, type MainBucketId } from "./bucketCategorizationService";
 
@@ -38,8 +37,8 @@ export const uploadContacts = async (
   const uniqueContacts = Object.values(deduplicatedContacts);
   console.log(`After deduplication: ${uniqueContacts.length} unique contacts`);
 
-  // Process contacts in smaller batches to avoid "Bad Request" errors
-  const batchSize = 100; // Reduced from 1000 to avoid query limits
+  // Process contacts in larger batches for better performance
+  const batchSize = 1000; // Increased from 100 to 1000
   let processed = 0;
   
   for (let i = 0; i < uniqueContacts.length; i += batchSize) {
@@ -50,22 +49,31 @@ export const uploadContacts = async (
     
     console.log(`Processing batch ${Math.floor(i / batchSize) + 1} with ${batchEmails.length} emails`);
     
-    // Fetch existing contacts for this batch with smaller query
-    const { data: existingContacts, error: fetchError } = await supabase
-      .from('contacts')
-      .select('*')
-      .in('email', batchEmails);
+    // Fetch existing contacts for this batch - split into smaller chunks if needed
+    let existingContacts: any[] = [];
+    const emailChunkSize = 500; // Supabase has limits on IN clause size
+    
+    for (let j = 0; j < batchEmails.length; j += emailChunkSize) {
+      const emailChunk = batchEmails.slice(j, j + emailChunkSize);
+      
+      const { data: chunkData, error: fetchError } = await supabase
+        .from('contacts')
+        .select('*')
+        .in('email', emailChunk);
 
-    if (fetchError) {
-      console.error('Error fetching existing contacts:', fetchError);
-      throw fetchError;
+      if (fetchError) {
+        console.error('Error fetching existing contacts:', fetchError);
+        throw fetchError;
+      }
+
+      existingContacts = existingContacts.concat(chunkData || []);
     }
 
-    console.log(`Found ${existingContacts?.length || 0} existing contacts in this batch`);
+    console.log(`Found ${existingContacts.length} existing contacts in this batch`);
 
     // Create a map of existing contacts
     const existingContactsMap = new Map(
-      (existingContacts || []).map(contact => [contact.email, contact])
+      existingContacts.map(contact => [contact.email, contact])
     );
 
     // Prepare data for insertion with proper summit history merging
@@ -104,19 +112,24 @@ export const uploadContacts = async (
     });
 
     console.log(`Inserting batch ${Math.floor(i / batchSize) + 1}:`, contactsToInsert.length, 'contacts');
-    console.log('Sample contact with summit history:', contactsToInsert[0]);
 
-    // Insert batch with upsert to handle duplicates
-    const { error } = await supabase
-      .from('contacts')
-      .upsert(contactsToInsert, { 
-        onConflict: 'email',
-        ignoreDuplicates: false 
-      });
+    // Insert batch with upsert to handle duplicates - split into smaller chunks for insertion
+    const insertChunkSize = 500; // Smaller chunks for insertion to avoid timeout
+    
+    for (let k = 0; k < contactsToInsert.length; k += insertChunkSize) {
+      const insertChunk = contactsToInsert.slice(k, k + insertChunkSize);
+      
+      const { error } = await supabase
+        .from('contacts')
+        .upsert(insertChunk, { 
+          onConflict: 'email',
+          ignoreDuplicates: false 
+        });
 
-    if (error) {
-      console.error('Error inserting batch:', error);
-      throw error;
+      if (error) {
+        console.error('Error inserting chunk:', error);
+        throw error;
+      }
     }
 
     processed += batch.length;
