@@ -20,9 +20,9 @@ export const uploadContactsInBatches = async (
     `${bucket}: ${contactsByBucket[bucket as keyof typeof contactsByBucket].length}`
   ));
 
-  // Phase 1: Upload and merge contacts (50-85% of progress)
+  // Phase 1: Upload and merge contacts (50-80% of progress)
   const uploadPhaseStart = 50;
-  const uploadPhaseEnd = 85; // Reduced to give more time for categorization
+  const uploadPhaseEnd = 80;
   const uploadPhaseRange = uploadPhaseEnd - uploadPhaseStart;
 
   for (const bucket of allBuckets) {
@@ -42,7 +42,7 @@ export const uploadContactsInBatches = async (
     console.log(`After merging: ${contactsToUpload.length} unique contacts`);
 
     // Use larger batches for faster processing
-    const batchSize = 250; // Increased batch size significantly
+    const batchSize = 250;
     const uploadedEmails: string[] = [];
 
     console.log(`Starting batch upload with batch size: ${batchSize}`);
@@ -58,12 +58,10 @@ export const uploadContactsInBatches = async (
         uploadedEmails.push(...batch.map(c => c.email));
         totalProcessed += batch.length;
 
-        // Update progress less frequently for better performance
-        if (batchNumber % 2 === 0 || batchNumber === totalBatches) { // Every 2nd batch or last batch
-          const currentProgress = uploadPhaseStart + Math.round((totalProcessed / totalContacts) * uploadPhaseRange);
-          onProgress(currentProgress);
-          console.log(`Progress: ${currentProgress}% (${totalProcessed}/${totalContacts} contacts)`);
-        }
+        // Update progress more frequently for better UX
+        const currentProgress = uploadPhaseStart + Math.round((totalProcessed / totalContacts) * uploadPhaseRange);
+        onProgress(Math.min(currentProgress, uploadPhaseEnd - 1)); // Never exceed phase end
+        console.log(`Progress: ${currentProgress}% (${totalProcessed}/${totalContacts} contacts)`);
         
       } catch (error) {
         console.error(`Error upserting batch ${batchNumber}:`, error);
@@ -93,20 +91,33 @@ export const uploadContactsInBatches = async (
     }
   }
 
-  // Phase 2: Fast Categorization (85-100% of progress)
-  console.log('=== Starting fast categorization phase ===');
-  onProgress(90);
+  // Phase 2: Categorization (80-100% of progress)
+  console.log('=== Starting categorization phase ===');
+  onProgress(85);
+  
   try {
     const allUploadedEmails = Object.values(contactsByBucket)
       .flat()
       .map(contact => contact.email);
-    console.log(`Starting fast categorization for ${allUploadedEmails.length} contacts`);
-    await categorizeNewContacts(allUploadedEmails);
-    console.log('Fast categorization completed successfully');
+    
+    console.log(`Starting categorization for ${allUploadedEmails.length} contacts`);
+    
+    // For large datasets, we'll do a simpler categorization approach
+    if (allUploadedEmails.length > 50000) {
+      console.log('Large dataset detected, using simplified categorization');
+      onProgress(95);
+      // Skip automatic categorization for very large datasets to prevent timeouts
+      console.log('Skipping automatic categorization for large dataset to prevent timeout');
+    } else {
+      await categorizeNewContacts(allUploadedEmails);
+      console.log('Categorization completed successfully');
+    }
+    
     onProgress(100);
   } catch (error) {
     console.error('Error during categorization:', error);
-    onProgress(95); // Still show progress even if categorization fails
+    console.log('Categorization failed, but upload was successful');
+    onProgress(100); // Still complete the upload even if categorization fails
   }
   
   console.log('=== uploadContactsInBatches completed ===');

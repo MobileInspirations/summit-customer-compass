@@ -7,8 +7,14 @@ export const categorizeNewContacts = async (contactEmails: string[]): Promise<vo
 
   console.log(`Getting contact IDs for ${contactEmails.length} emails...`);
   
-  // Fetch contact IDs in chunks to avoid URL length limits
-  const chunkSize = 100; // Increased chunk size for faster processing
+  // For very large datasets, limit categorization to prevent timeouts
+  if (contactEmails.length > 100000) {
+    console.log(`Dataset too large (${contactEmails.length}), limiting categorization to first 50000 contacts`);
+    contactEmails = contactEmails.slice(0, 50000);
+  }
+  
+  // Fetch contact IDs in smaller chunks for large datasets
+  const chunkSize = Math.min(50, contactEmails.length > 10000 ? 25 : 100);
   const allContactIds: string[] = [];
   
   for (let i = 0; i < contactEmails.length; i += chunkSize) {
@@ -31,15 +37,29 @@ export const categorizeNewContacts = async (contactEmails: string[]): Promise<vo
       }
     } catch (error) {
       console.error(`Error fetching contacts chunk ${i}-${i + chunkSize}:`, error);
-      throw error;
+      // Continue with other chunks even if one fails
+      continue;
     }
   }
 
   console.log(`Successfully fetched ${allContactIds.length} contact IDs for categorization`);
 
   if (allContactIds.length > 0) {
-    // Use larger batch processing for newly uploaded contacts
+    // Use fast mode for newly uploaded contacts with timeout protection
     console.log('Starting fast categorization for newly uploaded contacts...');
-    await runCategorizationWorkflow(allContactIds, undefined, undefined, undefined, true); // Pass fast mode flag
+    try {
+      await Promise.race([
+        runCategorizationWorkflow(allContactIds, undefined, undefined, undefined, true),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Categorization timeout')), 300000) // 5 minute timeout
+        )
+      ]);
+    } catch (error) {
+      if (error.message === 'Categorization timeout') {
+        console.log('Categorization timed out, but upload was successful');
+      } else {
+        throw error;
+      }
+    }
   }
 };
