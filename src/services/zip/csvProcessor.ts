@@ -9,6 +9,7 @@ export interface ProcessedContact {
   engagement_level: 'H' | 'L' | 'M' | 'U';
   tags: string[];
   bucket: MainBucketId;
+  folder_path: string[]; // Store the full folder path for additional context
 }
 
 export const processZipStructure = async (files: ZipFileEntry[]): Promise<ProcessedContact[]> => {
@@ -82,7 +83,7 @@ export const processZipStructure = async (files: ZipFileEntry[]): Promise<Proces
     if (!engagementMatch) {
       console.warn(`No engagement level found in filename: ${filename}, defaulting to M`);
       // Default to M (Medium) if no engagement level found
-      const csvContacts = parseCSVContent(file.content, summitName, 'M', bucket);
+      const csvContacts = parseCSVContent(file.content, summitName, 'M', bucket, pathParts);
       contacts.push(...csvContacts);
       continue;
     }
@@ -92,7 +93,7 @@ export const processZipStructure = async (files: ZipFileEntry[]): Promise<Proces
 
     // Parse CSV content
     try {
-      const csvContacts = parseCSVContent(file.content, summitName, engagementLevel, bucket);
+      const csvContacts = parseCSVContent(file.content, summitName, engagementLevel, bucket, pathParts);
       contacts.push(...csvContacts);
       console.log(`Successfully processed ${csvContacts.length} contacts from ${file.name}`);
     } catch (error) {
@@ -108,7 +109,8 @@ const parseCSVContent = (
   content: string, 
   summitName: string, 
   engagementLevel: 'H' | 'L' | 'M' | 'U',
-  bucket: MainBucketId
+  bucket: MainBucketId,
+  folderPath: string[]
 ): ProcessedContact[] => {
   console.log(`Parsing CSV content for summit: ${summitName}, engagement: ${engagementLevel}, bucket: ${bucket}`);
   
@@ -121,6 +123,11 @@ const parseCSVContent = (
   }
 
   const contacts: ProcessedContact[] = [];
+  
+  // Create comprehensive tags from folder structure and metadata
+  const folderTags = folderPath.filter(folder => folder.trim() !== '');
+  const engagementTag = `${engagementLevel}-Engagement`;
+  const bucketTag = `${bucket}-bucket`;
   
   // Skip header row and process data
   for (let i = 1; i < lines.length; i++) {
@@ -138,14 +145,23 @@ const parseCSVContent = (
         continue;
       }
 
+      // Comprehensive tagging from folder structure and metadata
+      const allTags = [
+        summitName,
+        engagementTag,
+        bucketTag,
+        ...folderTags
+      ].filter(tag => tag && tag.trim() !== '');
+
       contacts.push({
         email,
         name: columns[1]?.trim() || undefined,
         company: columns[2]?.trim() || undefined,
         summit_history: [summitName],
         engagement_level: engagementLevel,
-        tags: [summitName],
-        bucket
+        tags: allTags,
+        bucket,
+        folder_path: folderPath
       });
     } catch (error) {
       console.error(`Error parsing line ${i}: ${line}`, error);

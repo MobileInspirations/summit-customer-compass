@@ -26,7 +26,9 @@ export const mergeContactsByEmail = (contacts: ProcessedContact[]): Record<strin
     if (!existing) {
       merged[contact.email] = { ...contact };
     } else {
-      // Merge the data, combining arrays and preferring non-empty values
+      // Comprehensive merging - combine all data points
+      console.log(`Merging duplicate contact: ${contact.email}`);
+      
       merged[contact.email] = {
         email: contact.email,
         name: contact.name || existing.name,
@@ -34,8 +36,15 @@ export const mergeContactsByEmail = (contacts: ProcessedContact[]): Record<strin
         summit_history: [...new Set([...existing.summit_history, ...contact.summit_history])],
         engagement_level: contact.engagement_level || existing.engagement_level,
         tags: [...new Set([...existing.tags, ...contact.tags])],
-        bucket: contact.bucket // Use the most recent bucket assignment
+        bucket: contact.bucket, // Use the most recent bucket assignment
+        folder_path: [...new Set([...existing.folder_path, ...contact.folder_path])]
       };
+      
+      console.log(`Merged contact ${contact.email}:`, {
+        summitHistoryCount: merged[contact.email].summit_history.length,
+        tagsCount: merged[contact.email].tags.length,
+        folderPathCount: merged[contact.email].folder_path.length
+      });
     }
   });
 

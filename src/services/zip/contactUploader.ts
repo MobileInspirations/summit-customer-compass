@@ -34,7 +34,7 @@ export const uploadContactsInBatches = async (
     const contactsToUpload = Object.values(mergedContacts);
     console.log(`After merging: ${contactsToUpload.length} unique contacts`);
 
-    // Upload in batches of 100 (reduced from 1000 for better progress tracking)
+    // Upload in batches of 100
     const batchSize = 100;
     const uploadedEmails: string[] = [];
 
@@ -48,7 +48,7 @@ export const uploadContactsInBatches = async (
         const contact = batch[j];
         try {
           console.log(`Upserting contact ${j + 1}/${batch.length}: ${contact.email}`);
-          await upsertContactWithMerging(contact);
+          await upsertContactWithProperMerging(contact);
           uploadedEmails.push(contact.email);
           totalProcessed++;
 
@@ -92,7 +92,7 @@ export const uploadContactsInBatches = async (
   console.log('=== uploadContactsInBatches completed ===');
 };
 
-const upsertContactWithMerging = async (contact: ProcessedContact): Promise<void> => {
+const upsertContactWithProperMerging = async (contact: ProcessedContact): Promise<void> => {
   // First, check if contact exists
   const { data: existingContact, error: fetchError } = await supabase
     .from('contacts')
@@ -108,25 +108,33 @@ const upsertContactWithMerging = async (contact: ProcessedContact): Promise<void
   let finalContact;
 
   if (existingContact) {
-    // Merge with existing data
+    // Merge with existing data - UPDATE scenario
+    console.log(`Updating existing contact: ${contact.email}`);
+    
+    // Merge summit history and tags intelligently
+    const existingSummitHistory = existingContact.summit_history || [];
+    const existingTags = existingContact.tags || [];
+    
     finalContact = {
       email: contact.email,
       full_name: contact.name || existingContact.full_name,
       company: contact.company || existingContact.company,
-      summit_history: [...new Set([
-        ...(existingContact.summit_history || []),
-        ...contact.summit_history
-      ])],
+      summit_history: [...new Set([...existingSummitHistory, ...contact.summit_history])],
       engagement_level: contact.engagement_level || existingContact.engagement_level,
-      tags: [...new Set([
-        ...(existingContact.tags || []),
-        ...contact.tags
-      ])]
+      tags: [...new Set([...existingTags, ...contact.tags])]
     };
     
-    console.log(`Updating existing contact: ${contact.email}`);
+    console.log(`Merging data for ${contact.email}:`, {
+      existingSummitHistory: existingSummitHistory.length,
+      newSummitHistory: contact.summit_history.length,
+      finalSummitHistory: finalContact.summit_history.length,
+      existingTags: existingTags.length,
+      newTags: contact.tags.length,
+      finalTags: finalContact.tags.length
+    });
   } else {
-    // New contact
+    // New contact - CREATE scenario
+    console.log(`Creating new contact: ${contact.email}`);
     finalContact = {
       email: contact.email,
       full_name: contact.name || null,
@@ -136,7 +144,11 @@ const upsertContactWithMerging = async (contact: ProcessedContact): Promise<void
       tags: contact.tags
     };
     
-    console.log(`Creating new contact: ${contact.email}`);
+    console.log(`New contact data for ${contact.email}:`, {
+      summitHistory: finalContact.summit_history.length,
+      tags: finalContact.tags.length,
+      engagementLevel: finalContact.engagement_level
+    });
   }
 
   // Upsert the contact
@@ -151,4 +163,6 @@ const upsertContactWithMerging = async (contact: ProcessedContact): Promise<void
     console.error('Error upserting contact:', error);
     throw error;
   }
+
+  console.log(`Successfully ${existingContact ? 'updated' : 'created'} contact: ${contact.email}`);
 };
