@@ -20,7 +20,7 @@ export const runEnhancedCategorizationWorkflow = async (
   try {
     // Fetch contacts and categories
     let contacts;
-    if (contactIds) {
+    if (contactIds && contactIds.length > 0) {
       // If specific contact IDs are provided, fetch all uncategorized and filter
       const allContacts = await fetchUncategorizedContacts();
       contacts = allContacts.filter(c => contactIds.includes(c.id));

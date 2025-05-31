@@ -76,6 +76,8 @@ export const categorizeContacts = async (
   cancellationToken?: CancellationToken,
   contactLimit?: number
 ): Promise<CategorizationResults> => {
+  console.log(`categorizeContacts called with contactLimit: ${contactLimit}, contactIds: ${contactIds?.length || 0}, useAI: ${useAI}`);
+  
   let totalProcessed = 0;
   
   if (useAI) {
@@ -99,6 +101,8 @@ export const categorizeContactsWithAI = async (
   cancellationToken?: CancellationToken,
   contactLimit?: number
 ): Promise<CategorizationResults> => {
+  console.log(`categorizeContactsWithAI called with contactLimit: ${contactLimit}, contactIds: ${contactIds?.length || 0}`);
+  
   const totalProcessed = await runEnhancedCategorizationWorkflow(contactIds, true, openaiApiKey, onProgress, cancellationToken, contactLimit);
   return generateCategorizationResults(totalProcessed, true);
 };
