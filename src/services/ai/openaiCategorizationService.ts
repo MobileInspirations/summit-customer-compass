@@ -1,3 +1,4 @@
+
 import OpenAI from 'openai';
 
 const PERSONALITY_BUCKETS = {
@@ -18,17 +19,24 @@ let openaiApiKey: string | null = null;
 
 export const initializeOpenAI = (apiKey: string) => {
   openaiApiKey = apiKey;
+  console.log('OpenAI API key initialized for AI categorization');
 };
 
 export const categorizeContactWithAI = async (
   contactTags: string[],
   summitHistory: string[] = []
 ): Promise<string> => {
+  console.log('=== Starting AI categorization ===');
+  console.log('Contact tags:', contactTags);
+  console.log('Summit history:', summitHistory);
+  
   if (!openaiApiKey) {
+    console.error('OpenAI API key not provided');
     throw new Error('OpenAI API key not provided');
   }
 
   if (!contactTags.length && !summitHistory.length) {
+    console.log('No data provided, using default category');
     return "Digital Marketing & Content Creation Skills"; // Default fallback
   }
 
@@ -37,6 +45,8 @@ export const categorizeContactWithAI = async (
     ...contactTags,
     ...summitHistory
   ].join(', ');
+
+  console.log('Combined contact data:', contactData);
 
   const bucketList = Object.entries(PERSONALITY_BUCKETS)
     .map(([name, desc]) => `${name}: ${desc}`)
@@ -59,6 +69,8 @@ Instructions:
 Bucket:`;
 
   try {
+    console.log('Making request to OpenAI API...');
+    
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -82,15 +94,22 @@ Bucket:`;
       })
     });
 
+    console.log('OpenAI API response status:', response.status);
+
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('OpenAI API error:', response.status, errorText);
       throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
     const bucketName = data.choices[0]?.message?.content?.trim();
     
+    console.log('OpenAI returned bucket name:', bucketName);
+    
     // Validate the response is one of our buckets
     if (bucketName && Object.keys(PERSONALITY_BUCKETS).includes(bucketName)) {
+      console.log('Valid bucket name returned:', bucketName);
       return bucketName;
     }
     
@@ -107,20 +126,27 @@ Bucket:`;
 const fallbackCategorization = (contactTags: string[], summitHistory: string[]): string => {
   const allData = [...contactTags, ...summitHistory].join(' ').toLowerCase();
   
+  console.log('Using fallback categorization for data:', allData);
+  
   // Simple keyword-based fallback
   if (allData.includes('business') || allData.includes('entrepreneur') || allData.includes('marketing')) {
+    console.log('Fallback: Assigned to Entrepreneurship & Business Development');
     return "Entrepreneurship & Business Development";
   }
   if (allData.includes('health') || allData.includes('fitness') || allData.includes('nutrition')) {
+    console.log('Fallback: Assigned to Fitness, Nutrition & Weight Management');
     return "Fitness, Nutrition & Weight Management";
   }
   if (allData.includes('finance') || allData.includes('invest') || allData.includes('crypto')) {
+    console.log('Fallback: Assigned to Investing, Finance & Wealth Creation');
     return "Investing, Finance & Wealth Creation";
   }
   if (allData.includes('wellness') || allData.includes('natural') || allData.includes('organic')) {
+    console.log('Fallback: Assigned to Holistic Wellness & Natural Living');
     return "Holistic Wellness & Natural Living";
   }
   
+  console.log('Fallback: Using default category');
   return "Digital Marketing & Content Creation Skills"; // Default
 };
 
@@ -130,6 +156,8 @@ export const ensurePersonalityBucketsExist = async () => {
   console.log('Ensuring personality type buckets exist...');
   
   for (const [bucketName, description] of Object.entries(PERSONALITY_BUCKETS)) {
+    console.log(`Checking for personality bucket: ${bucketName}`);
+    
     const { data: existing, error: checkError } = await supabase
       .from('customer_categories')
       .select('id')
@@ -143,6 +171,7 @@ export const ensurePersonalityBucketsExist = async () => {
     }
 
     if (!existing) {
+      console.log(`Creating personality bucket: ${bucketName}`);
       const { error: insertError } = await supabase
         .from('customer_categories')
         .insert({
@@ -155,10 +184,14 @@ export const ensurePersonalityBucketsExist = async () => {
       if (insertError) {
         console.error('Error creating personality bucket:', bucketName, insertError);
       } else {
-        console.log('Created personality bucket:', bucketName);
+        console.log('Successfully created personality bucket:', bucketName);
       }
+    } else {
+      console.log(`Personality bucket already exists: ${bucketName}`);
     }
   }
+  
+  console.log('Finished ensuring personality buckets exist');
 };
 
 const getRandomColor = (): string => {
