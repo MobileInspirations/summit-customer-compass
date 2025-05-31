@@ -1,85 +1,79 @@
 
 import { fetchUncategorizedContacts } from "../data/uncategorizedContactsService";
 import { fetchCategories } from "../data/contactDataService";
-import { categorizeContactBatch } from "../categorization/contactProcessor";
+import { categorizeContact } from "../categorization/contactProcessor";
 import { ProgressTracker } from "../utils/progressTracker";
 import { CancellationToken } from "../utils/cancellationToken";
-import { errorLogger, timeOperation } from "../utils/errorLogger";
 
 export const runCategorizationWorkflow = async (
   contactIds?: string[],
   onProgress?: (progress: any) => void,
   cancellationToken?: CancellationToken,
-  contactLimit?: number,
-  fastMode?: boolean // New parameter for faster processing
-): Promise<number> => {
-  console.log('Starting categorization workflow...');
+  contactLimit?: number
+): Promise<{ totalProcessed: number; processedContactIds: string[] }> => {
+  console.log(`Starting categorization workflow with contact limit: ${contactLimit || 'no limit'}`);
   
   const progressTracker = new ProgressTracker(onProgress);
   
   try {
-    // Fetch contacts and categories with timing
-    const [contacts, categories] = await timeOperation(
-      'fetch-data',
-      async () => Promise.all([
-        contactIds ? 
-          fetchUncategorizedContacts().then(all => all.filter(c => contactIds.includes(c.id))) :
-          fetchUncategorizedContacts(contactLimit),
-        fetchCategories()
-      ]),
-      { contactIds: contactIds?.length, contactLimit }
-    );
+    // Fetch contacts and categories
+    let contacts;
+    if (contactIds && contactIds.length > 0) {
+      // If specific contact IDs are provided, fetch all uncategorized and filter
+      const allContacts = await fetchUncategorizedContacts();
+      contacts = allContacts.filter(c => contactIds.includes(c.id));
+      console.log(`Filtered to ${contacts.length} specific contacts from ${allContacts.length} total`);
+    } else {
+      // Apply the contact limit directly when fetching
+      contacts = await fetchUncategorizedContacts(contactLimit);
+      console.log(`Fetched ${contacts.length} contacts with limit: ${contactLimit || 'no limit'}`);
+    }
+
+    const categories = await fetchCategories();
 
     if (!contacts.length) {
       console.log('No contacts to categorize');
-      return 0;
+      return { totalProcessed: 0, processedContactIds: [] };
     }
 
     const totalContacts = contacts.length;
-    console.log(`Found ${totalContacts} contacts to categorize`);
+    console.log(`Processing ${totalContacts} contacts`);
     
     progressTracker.initialize(totalContacts);
 
-    // Use larger batch sizes for faster processing when in fast mode
-    const batchSize = fastMode ? 200 : 50; // Much larger batches for uploads
+    // Process contacts in batches for better performance
+    const batchSize = 100;
     const totalBatches = Math.ceil(totalContacts / batchSize);
     let processedCount = 0;
+    const processedContactIds: string[] = [];
 
-    console.log(`Processing ${totalContacts} contacts in ${totalBatches} batches of ${batchSize}`);
-
-    for (let i = 0; i < totalBatches; i++) {
+    for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
       // Check for cancellation
       if (cancellationToken?.isCancelled) {
         console.log('Categorization cancelled by user');
         throw new Error('Operation was cancelled');
       }
 
-      const startIdx = i * batchSize;
-      const endIdx = Math.min(startIdx + batchSize, totalContacts);
-      const batch = contacts.slice(startIdx, endIdx);
-
-      console.log(`Processing batch ${i + 1}/${totalBatches} (${batch.length} contacts)`);
-
-      await timeOperation(
-        `categorize-batch-${i + 1}`,
-        () => categorizeContactBatch(batch, categories),
-        { batchSize: batch.length, batchIndex: i + 1 }
-      );
+      const startIndex = batchIndex * batchSize;
+      const endIndex = Math.min(startIndex + batchSize, totalContacts);
+      const batchContacts = contacts.slice(startIndex, endIndex);
       
-      processedCount += batch.length;
-      progressTracker.updateProgress(processedCount, i + 1, totalBatches);
+      console.log(`Processing batch ${batchIndex + 1}/${totalBatches}: ${batchContacts.length} contacts`);
 
-      // Reduce delay between batches in fast mode
-      if (!fastMode && i < totalBatches - 1) {
-        await new Promise(resolve => setTimeout(resolve, 10)); // Small delay only in normal mode
+      // Process each contact in the batch
+      for (const contact of batchContacts) {
+        await categorizeContact(contact, categories);
+        processedCount++;
+        processedContactIds.push(contact.id);
       }
+      
+      progressTracker.updateProgress(processedCount, batchIndex + 1, totalBatches);
     }
 
     console.log(`Categorization workflow completed. Processed ${processedCount} contacts.`);
-    return processedCount;
+    return { totalProcessed: processedCount, processedContactIds };
     
   } catch (error) {
-    errorLogger.log('categorization-workflow', error as Error, { contactIds: contactIds?.length, contactLimit });
     console.error('Error in categorization workflow:', error);
     throw error;
   }

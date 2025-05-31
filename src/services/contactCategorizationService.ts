@@ -1,4 +1,3 @@
-
 import { runCategorizationWorkflow } from "./workflows/categorizationWorkflow";
 import { runEnhancedCategorizationWorkflow } from "./workflows/enhancedCategorizationWorkflow";
 import { categorizeNewContacts as categorizeNewContactsHelper } from "./helpers/newContactCategorization";
@@ -24,40 +23,80 @@ export interface CategorizationResults {
   isAI: boolean;
 }
 
-// Helper function to generate categorization results
-const generateCategorizationResults = async (totalProcessed: number, isAI: boolean): Promise<CategorizationResults> => {
-  // Fetch all categories with their counts
-  const { data: categories, error } = await supabase
+// Helper function to generate categorization results based on processed contacts
+const generateCategorizationResults = async (
+  totalProcessed: number, 
+  isAI: boolean,
+  processedContactIds?: string[]
+): Promise<CategorizationResults> => {
+  console.log(`Generating results for ${totalProcessed} processed contacts, processedContactIds provided: ${!!processedContactIds}`);
+  
+  // If we have specific contact IDs that were processed, only count those
+  // Otherwise, count all contacts (for backward compatibility)
+  let categoryCountsQuery = supabase
     .from('customer_categories')
     .select(`
       id,
       name,
       category_type,
-      contact_categories(count)
+      contact_categories!inner(
+        contact_id,
+        contacts!inner(id)
+      )
     `);
+
+  // If we processed specific contacts, filter to only those
+  if (processedContactIds && processedContactIds.length > 0) {
+    console.log(`Filtering results to ${processedContactIds.length} processed contacts`);
+    categoryCountsQuery = categoryCountsQuery
+      .in('contact_categories.contacts.id', processedContactIds);
+  }
+
+  const { data: categories, error } = await categoryCountsQuery;
 
   if (error) {
     console.error('Error fetching categorization results:', error);
     throw error;
   }
 
-  const customerCategories = categories
-    ?.filter(cat => cat.category_type === 'customer')
-    ?.map(cat => ({
-      categoryName: cat.name,
-      count: cat.contact_categories?.length || 0,
-      percentage: totalProcessed > 0 ? Math.round((cat.contact_categories?.length || 0) / totalProcessed * 100) : 0
-    }))
-    ?.sort((a, b) => b.count - a.count) || [];
+  console.log(`Retrieved ${categories?.length || 0} category records`);
 
-  const personalityCategories = categories
-    ?.filter(cat => cat.category_type === 'personality')
-    ?.map(cat => ({
+  // Count contacts per category
+  const categoryCounts = new Map<string, { name: string, type: string, count: number }>();
+  
+  categories?.forEach(cat => {
+    if (!categoryCounts.has(cat.id)) {
+      categoryCounts.set(cat.id, {
+        name: cat.name,
+        type: cat.category_type,
+        count: 0
+      });
+    }
+    // Count unique contact_categories entries for this category
+    categoryCounts.get(cat.id)!.count = cat.contact_categories?.length || 0;
+  });
+
+  console.log('Category counts:', Array.from(categoryCounts.entries()));
+
+  const customerCategories = Array.from(categoryCounts.values())
+    .filter(cat => cat.type === 'customer')
+    .map(cat => ({
       categoryName: cat.name,
-      count: cat.contact_categories?.length || 0,
-      percentage: totalProcessed > 0 ? Math.round((cat.contact_categories?.length || 0) / totalProcessed * 100) : 0
+      count: cat.count,
+      percentage: totalProcessed > 0 ? Math.round(cat.count / totalProcessed * 100) : 0
     }))
-    ?.sort((a, b) => b.count - a.count) || [];
+    .sort((a, b) => b.count - a.count);
+
+  const personalityCategories = Array.from(categoryCounts.values())
+    .filter(cat => cat.type === 'personality')
+    .map(cat => ({
+      categoryName: cat.name,
+      count: cat.count,
+      percentage: totalProcessed > 0 ? Math.round(cat.count / totalProcessed * 100) : 0
+    }))
+    .sort((a, b) => b.count - a.count);
+
+  console.log('Final results:', { totalProcessed, customerCategories, personalityCategories });
 
   return {
     totalProcessed,
@@ -79,15 +118,20 @@ export const categorizeContacts = async (
   console.log(`categorizeContacts called with contactLimit: ${contactLimit}, contactIds: ${contactIds?.length || 0}, useAI: ${useAI}`);
   
   let totalProcessed = 0;
+  let processedContactIds: string[] | undefined;
   
   if (useAI) {
-    totalProcessed = await runEnhancedCategorizationWorkflow(contactIds, useAI, openaiApiKey, onProgress, cancellationToken, contactLimit);
+    const result = await runEnhancedCategorizationWorkflow(contactIds, useAI, openaiApiKey, onProgress, cancellationToken, contactLimit);
+    totalProcessed = result.totalProcessed;
+    processedContactIds = result.processedContactIds;
   } else {
-    totalProcessed = await runCategorizationWorkflow(contactIds, onProgress, cancellationToken, contactLimit);
+    const result = await runCategorizationWorkflow(contactIds, onProgress, cancellationToken, contactLimit);
+    totalProcessed = result.totalProcessed;
+    processedContactIds = result.processedContactIds;
   }
 
-  // Generate and return categorization results
-  return generateCategorizationResults(totalProcessed, useAI);
+  // Generate and return categorization results using only the processed contacts
+  return generateCategorizationResults(totalProcessed, useAI, processedContactIds);
 };
 
 // Helper function to run categorization on newly uploaded contacts
@@ -103,6 +147,6 @@ export const categorizeContactsWithAI = async (
 ): Promise<CategorizationResults> => {
   console.log(`categorizeContactsWithAI called with contactLimit: ${contactLimit}, contactIds: ${contactIds?.length || 0}`);
   
-  const totalProcessed = await runEnhancedCategorizationWorkflow(contactIds, true, openaiApiKey, onProgress, cancellationToken, contactLimit);
-  return generateCategorizationResults(totalProcessed, true);
+  const result = await runEnhancedCategorizationWorkflow(contactIds, true, openaiApiKey, onProgress, cancellationToken, contactLimit);
+  return generateCategorizationResults(result.totalProcessed, true, result.processedContactIds);
 };

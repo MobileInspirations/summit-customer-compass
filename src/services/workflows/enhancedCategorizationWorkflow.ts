@@ -12,7 +12,7 @@ export const runEnhancedCategorizationWorkflow = async (
   onProgress?: (progress: any) => void,
   cancellationToken?: CancellationToken,
   contactLimit?: number
-): Promise<number> => {
+): Promise<{ totalProcessed: number; processedContactIds: string[] }> => {
   console.log(`Starting enhanced categorization workflow with AI: ${useAI}, contact limit: ${contactLimit || 'no limit'}`);
   
   const progressTracker = new ProgressTracker(onProgress);
@@ -35,7 +35,7 @@ export const runEnhancedCategorizationWorkflow = async (
 
     if (!contacts.length) {
       console.log('No contacts to categorize');
-      return 0;
+      return { totalProcessed: 0, processedContactIds: [] };
     }
 
     const totalContacts = contacts.length;
@@ -46,6 +46,7 @@ export const runEnhancedCategorizationWorkflow = async (
     // Process contacts individually for AI categorization (slower but more accurate)
     let processedCount = 0;
     const totalBatches = totalContacts; // Each contact is its own "batch" for AI
+    const processedContactIds: string[] = [];
 
     for (let i = 0; i < totalContacts; i++) {
       // Check for cancellation
@@ -60,11 +61,12 @@ export const runEnhancedCategorizationWorkflow = async (
       await categorizeContactEnhanced(contact, categories, useAI);
       
       processedCount++;
+      processedContactIds.push(contact.id);
       progressTracker.updateProgress(processedCount, i + 1, totalBatches);
     }
 
     console.log(`Enhanced categorization workflow completed. Processed ${processedCount} contacts.`);
-    return processedCount;
+    return { totalProcessed: processedCount, processedContactIds };
     
   } catch (error) {
     console.error('Error in enhanced categorization workflow:', error);
