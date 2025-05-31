@@ -2,21 +2,24 @@
 import { runCategorizationWorkflow } from "./workflows/categorizationWorkflow";
 import { runEnhancedCategorizationWorkflow } from "./workflows/enhancedCategorizationWorkflow";
 import { categorizeNewContacts as categorizeNewContactsHelper } from "./helpers/newContactCategorization";
+import { CancellationToken } from "./utils/cancellationToken";
 
 // Re-export the progress interface for backward compatibility
 export type { CategorizationProgress } from "./utils/progressTracker";
+export { CancellationToken } from "./utils/cancellationToken";
 
-// Main categorization function - now supports AI categorization
+// Main categorization function - now supports AI categorization and cancellation
 export const categorizeContacts = async (
   contactIds?: string[],
   onProgress?: (progress: any) => void,
   useAI: boolean = false,
-  openaiApiKey?: string
+  openaiApiKey?: string,
+  cancellationToken?: CancellationToken
 ) => {
   if (useAI && openaiApiKey) {
-    return runEnhancedCategorizationWorkflow(contactIds, useAI, openaiApiKey, onProgress);
+    return runEnhancedCategorizationWorkflow(contactIds, useAI, openaiApiKey, onProgress, cancellationToken);
   } else {
-    return runCategorizationWorkflow(contactIds, onProgress);
+    return runCategorizationWorkflow(contactIds, onProgress, cancellationToken);
   }
 };
 
@@ -27,7 +30,8 @@ export const categorizeNewContacts = categorizeNewContactsHelper;
 export const categorizeContactsWithAI = async (
   openaiApiKey: string,
   contactIds?: string[],
-  onProgress?: (progress: any) => void
+  onProgress?: (progress: any) => void,
+  cancellationToken?: CancellationToken
 ) => {
-  return runEnhancedCategorizationWorkflow(contactIds, true, openaiApiKey, onProgress);
+  return runEnhancedCategorizationWorkflow(contactIds, true, openaiApiKey, onProgress, cancellationToken);
 };

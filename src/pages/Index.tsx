@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCategoriesByType } from "@/hooks/useCategories";
 import { useContactsCount } from "@/hooks/useContacts";
 import { useBucketCounts } from "@/hooks/useBucketCounts";
-import { categorizeContacts } from "@/services/contactCategorizationService";
+import { categorizeContacts, CancellationToken } from "@/services/contactCategorizationService";
 import { sortContacts } from "@/services/contactSortingService";
 import { exportAllTags } from "@/services/tagExportService";
 import { useAuth } from "@/hooks/useAuth";
@@ -52,6 +52,7 @@ const Index = () => {
     isComplete: false,
     isError: false
   });
+  const cancellationTokenRef = useRef<CancellationToken | null>(null);
   const { toast } = useToast();
   const { signOut } = useAuth();
   const navigate = useNavigate();
@@ -86,6 +87,18 @@ const Index = () => {
     setShowExportDialog(true);
   };
 
+  const handleStopCategorization = () => {
+    if (cancellationTokenRef.current) {
+      cancellationTokenRef.current.cancel();
+      setIsCategorizing(false);
+      toast({
+        title: "Categorization stopped",
+        description: "The categorization process has been cancelled.",
+        variant: "default",
+      });
+    }
+  };
+
   const handleCategorizeAll = async () => {
     setIsCategorizing(true);
     setCategorizationProgress({
@@ -96,16 +109,23 @@ const Index = () => {
       totalCount: 0
     });
 
+    // Create a new cancellation token
+    cancellationTokenRef.current = new CancellationToken();
+
     try {
       await categorizeContacts(undefined, (progress) => {
         setCategorizationProgress(progress);
-      });
+      }, false, undefined, cancellationTokenRef.current);
       queryClient.invalidateQueries({ queryKey: ["categories"] });
       toast({
         title: "Categorization complete",
         description: "All contacts have been automatically categorized into appropriate buckets.",
       });
     } catch (error) {
+      if (error instanceof Error && error.message === 'Operation was cancelled') {
+        // Don't show error toast for user-initiated cancellation
+        return;
+      }
       console.error('Categorization error:', error);
       toast({
         title: "Categorization failed",
@@ -114,6 +134,7 @@ const Index = () => {
       });
     } finally {
       setIsCategorizing(false);
+      cancellationTokenRef.current = null;
       setTimeout(() => {
         setCategorizationProgress({
           progress: 0,
@@ -136,16 +157,23 @@ const Index = () => {
       totalCount: 0
     });
 
+    // Create a new cancellation token
+    cancellationTokenRef.current = new CancellationToken();
+
     try {
       await categorizeContacts(undefined, (progress) => {
         setCategorizationProgress(progress);
-      }, true, apiKey);
+      }, true, apiKey, cancellationTokenRef.current);
       queryClient.invalidateQueries({ queryKey: ["categories"] });
       toast({
         title: "AI Categorization complete",
         description: "All contacts have been categorized using AI into personality type buckets.",
       });
     } catch (error) {
+      if (error instanceof Error && error.message === 'Operation was cancelled') {
+        // Don't show error toast for user-initiated cancellation
+        return;
+      }
       console.error('AI Categorization error:', error);
       toast({
         title: "AI Categorization failed",
@@ -155,6 +183,7 @@ const Index = () => {
     } finally {
       setIsCategorizing(false);
       setShowAIDialog(false);
+      cancellationTokenRef.current = null;
       setTimeout(() => {
         setCategorizationProgress({
           progress: 0,
@@ -341,6 +370,7 @@ const Index = () => {
         totalBatches={categorizationProgress.totalBatches}
         processedCount={categorizationProgress.processedCount}
         totalCount={categorizationProgress.totalCount}
+        onStop={isCategorizing ? handleStopCategorization : undefined}
       />
       <ExportProgress
         isVisible={isExporting || exportProgress.isComplete}

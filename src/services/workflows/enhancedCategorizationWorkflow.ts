@@ -1,4 +1,3 @@
-
 import { categorizeContactEnhanced } from "../categorization/enhancedContactProcessor";
 import { fetchCategories } from "../data/contactDataService";
 import { fetchUncategorizedContacts } from "../data/uncategorizedContactsService";
@@ -7,17 +6,22 @@ import { ensurePersonalityBucketsExist, initializeOpenAI } from "../ai/openaiCat
 import { createProgressUpdate, createInitialProgress } from "../utils/progressTracker";
 import type { ContactForCategorization } from "../types/contactTypes";
 import type { CategorizationProgress } from "../utils/progressTracker";
+import { CancellationToken } from "../utils/cancellationToken";
 
 export const runEnhancedCategorizationWorkflow = async (
   contactIds?: string[],
   useAI: boolean = false,
   openaiApiKey?: string,
-  onProgress?: (progress: CategorizationProgress) => void
+  onProgress?: (progress: CategorizationProgress) => void,
+  cancellationToken?: CancellationToken
 ): Promise<void> => {
   console.log('=== Starting enhanced contact categorization workflow ===');
   console.log('Parameters:', { contactIds: contactIds?.length || 'all', useAI, hasApiKey: !!openaiApiKey });
 
   try {
+    // Check for cancellation at the start
+    cancellationToken?.throwIfCancelled();
+
     // Initialize OpenAI if using AI categorization
     if (useAI && openaiApiKey) {
       console.log('Initializing OpenAI for AI categorization...');
@@ -81,6 +85,9 @@ export const runEnhancedCategorizationWorkflow = async (
     }
 
     for (let i = 0; i < allContacts.length; i += batchSize) {
+      // Check for cancellation before each batch
+      cancellationToken?.throwIfCancelled();
+
       const batch = allContacts.slice(i, i + batchSize);
       const currentBatch = Math.floor(i / batchSize) + 1;
       
@@ -88,6 +95,9 @@ export const runEnhancedCategorizationWorkflow = async (
       
       // Process in parallel sub-batches
       for (let j = 0; j < batch.length; j += parallelSize) {
+        // Check for cancellation before each sub-batch
+        cancellationToken?.throwIfCancelled();
+
         const parallelBatch = batch.slice(j, j + parallelSize);
         
         console.log(`Processing parallel batch: ${j + 1}-${j + parallelBatch.length} of ${batch.length}`);
@@ -95,11 +105,17 @@ export const runEnhancedCategorizationWorkflow = async (
         // Process this sub-batch in parallel
         const promises = parallelBatch.map(async (contact, index) => {
           try {
+            // Check for cancellation before processing each contact
+            cancellationToken?.throwIfCancelled();
+
             console.log(`Processing contact ${j + index + 1}/${batch.length}: ${contact.email}`);
             await categorizeContactEnhanced(contact as ContactForCategorization, categories, useAI);
             console.log(`Successfully categorized: ${contact.email}`);
             return true;
           } catch (error) {
+            if (error instanceof Error && error.message === 'Operation was cancelled') {
+              throw error; // Re-throw cancellation errors
+            }
             console.error(`Error categorizing contact ${contact.email}:`, error);
             return true; // Still count as processed to avoid infinite loops
           }
@@ -133,6 +149,10 @@ export const runEnhancedCategorizationWorkflow = async (
 
     console.log(`=== Enhanced contact categorization completed. Processed ${processedCount} contacts total. ===`);
   } catch (error) {
+    if (error instanceof Error && error.message === 'Operation was cancelled') {
+      console.log('=== Categorization was cancelled by user ===');
+      throw error;
+    }
     console.error('=== ERROR in enhanced categorization workflow ===', error);
     throw error;
   }

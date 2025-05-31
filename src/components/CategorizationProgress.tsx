@@ -1,6 +1,7 @@
 
 import { Progress } from "@/components/ui/progress";
-import { CheckCircle, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { CheckCircle, Loader2, X } from "lucide-react";
 
 interface CategorizationProgressProps {
   isVisible: boolean;
@@ -9,6 +10,7 @@ interface CategorizationProgressProps {
   totalBatches: number;
   processedCount: number;
   totalCount: number;
+  onStop?: () => void;
 }
 
 export const CategorizationProgress = ({
@@ -17,20 +19,22 @@ export const CategorizationProgress = ({
   currentBatch,
   totalBatches,
   processedCount,
-  totalCount
+  totalCount,
+  onStop
 }: CategorizationProgressProps) => {
   if (!isVisible) return null;
 
   const displayProgress = Math.max(0, Math.min(100, progress));
   const displayCurrentBatch = Math.max(1, currentBatch);
   const displayTotalBatches = Math.max(1, totalBatches);
+  const isComplete = displayProgress === 100;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
         <div className="text-center space-y-4">
           <div className="flex items-center justify-center space-x-2">
-            {displayProgress === 100 ? (
+            {isComplete ? (
               <CheckCircle className="w-6 h-6 text-green-600" />
             ) : (
               <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
@@ -57,11 +61,22 @@ export const CategorizationProgress = ({
             )}
           </div>
 
-          {displayProgress === 100 && (
+          {isComplete ? (
             <div className="flex items-center justify-center space-x-2 text-green-600">
               <CheckCircle className="w-5 h-5" />
               <span className="font-medium">Categorization Complete!</span>
             </div>
+          ) : (
+            onStop && (
+              <Button
+                onClick={onStop}
+                variant="outline"
+                className="mt-4 text-red-600 border-red-200 hover:bg-red-50"
+              >
+                <X className="w-4 h-4 mr-2" />
+                Stop Categorization
+              </Button>
+            )
           )}
         </div>
       </div>
