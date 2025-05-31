@@ -8,14 +8,22 @@ interface BucketCountResult {
   count: number;
 }
 
+// Define the bucket counts type
+type BucketCounts = {
+  'biz-op': number;
+  'health': number;
+  'survivalist': number;
+  'cannot-place': number;
+};
+
 export const useOptimizedBucketCounts = () => {
   return useQuery({
     queryKey: ["optimized-bucket-counts"],
-    queryFn: async () => {
+    queryFn: async (): Promise<BucketCounts> => {
       console.log('=== Starting optimized bucket counts calculation ===');
       
-      // Initialize with explicit object
-      const result = {
+      // Initialize with explicit type annotation
+      const result: BucketCounts = {
         'biz-op': 0,
         'health': 0,
         'survivalist': 0,
@@ -36,12 +44,12 @@ export const useOptimizedBucketCounts = () => {
 
       // Try to use RPC function first
       const { data: rpcData, error: rpcError } = await supabase
-        .rpc('get_bucket_counts') as { data: BucketCountResult[] | null; error: any };
+        .rpc('get_bucket_counts');
 
       if (!rpcError && rpcData && Array.isArray(rpcData)) {
         console.log('Using RPC function for bucket counts');
         
-        for (const item of rpcData) {
+        for (const item of rpcData as BucketCountResult[]) {
           if (item && item.bucket && typeof item.count === 'number') {
             const bucket = item.bucket.toString();
             if (bucket === 'biz-op') result['biz-op'] = item.count;
