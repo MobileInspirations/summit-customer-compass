@@ -2,6 +2,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { ContactForCategorization, CategoryData } from "../types/contactTypes";
 import { categorizeContactMandatoryBuckets, type ContactForRuleCategorization } from "../ruleBasedCategorizationService";
+import { deduplicateTags } from "../utils/tagUtils";
 
 export const categorizeContact = async (
   contact: ContactForCategorization, 
@@ -15,12 +16,8 @@ export const categorizeContact = async (
   const assignedCategories: string[] = [];
 
   try {
-    // Use the mandatory bucket categorization system
-    // Combine tags and summit_history for better categorization
-    const allTags = [
-      ...(contact.tags || []),
-      ...(contact.summit_history || [])
-    ];
+    // Use the mandatory bucket categorization system with deduplicated tags
+    const allTags = deduplicateTags(contact.tags, contact.summit_history);
 
     const contactForRules: ContactForRuleCategorization = {
       id: contact.id,
@@ -29,7 +26,7 @@ export const categorizeContact = async (
 
     console.log(`Prepared contact for rules:`, contactForRules);
     console.log(`Combined tags array length:`, contactForRules.tags?.length);
-    console.log(`Combined tags:`, contactForRules.tags);
+    console.log(`Combined tags (deduplicated):`, contactForRules.tags);
 
     const mandatoryResult = categorizeContactMandatoryBuckets(contactForRules);
     console.log(`Mandatory categorization for ${contact.email}: Main=${mandatoryResult.mainBucket}, Personality=${mandatoryResult.personalityBucket}`);

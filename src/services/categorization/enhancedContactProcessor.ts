@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { ContactForCategorization, CategoryData } from "../types/contactTypes";
 import { shouldAssignToCategory } from "./categorizationLogic";
 import { categorizeContactWithAI } from "../ai/openaiCategorizationService";
+import { deduplicateTags } from "../utils/tagUtils";
 
 export const categorizeContactEnhanced = async (
   contact: ContactForCategorization, 
@@ -81,13 +82,12 @@ export const categorizeContactEnhanced = async (
     if (useAI) {
       console.log('Starting AI personality categorization...');
       try {
-        // Extract tags from contact, fallback to empty array if not present
-        const contactTags = contact.tags || [];
-        const summitHistory = contact.summit_history || [];
+        // Use deduplicated tags for AI categorization
+        const contactTags = deduplicateTags(contact.tags, contact.summit_history);
         
-        console.log('Sending to AI:', { contactTags, summitHistory });
+        console.log('Sending to AI:', { contactTags });
         
-        const aiCategoryName = await categorizeContactWithAI(contactTags, summitHistory);
+        const aiCategoryName = await categorizeContactWithAI(contactTags, []);
         
         const aiCategory = categories.find(cat => 
           cat.name === aiCategoryName && cat.category_type === 'personality'
