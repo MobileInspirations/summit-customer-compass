@@ -30,7 +30,7 @@ export function categorizeContactMandatoryBuckets(
 
   // Define the actual lists of bucket names (excluding 'Cannot Place' entirely)
   const mainBucketNameList = [
-    MAIN_BUCKET_NAMES.BUSINESS_OPERATIONS,
+    MAIN_BUCKET_NAMES.BIZ_OPS,
     MAIN_BUCKET_NAMES.HEALTH,
     MAIN_BUCKET_NAMES.SURVIVALIST
   ];
