@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { assignContactsToBucket, type MainBucketId } from "../bucketCategorizationService";
 import { categorizeNewContacts } from "../contactCategorizationService";
@@ -87,10 +88,10 @@ export const uploadContactsInBatches = async (
       console.log(`Completed batch ${batchNumber}, total processed: ${totalProcessed}`);
     }
 
-    // Assign contacts to their respective buckets
+    // Assign contacts to their respective buckets with chunked approach
     console.log(`=== Assigning ${uploadedEmails.length} contacts to ${bucket} bucket ===`);
     try {
-      await assignContactsToBucket(uploadedEmails, bucket);
+      await assignContactsToBucketChunked(uploadedEmails, bucket);
       console.log(`Successfully assigned ${uploadedEmails.length} contacts to ${bucket} bucket`);
     } catch (error) {
       console.error(`Error assigning contacts to ${bucket} bucket:`, error);
@@ -119,20 +120,12 @@ export const uploadContactsInBatches = async (
 const upsertContactBatch = async (contacts: ProcessedContact[]): Promise<void> => {
   console.log(`Batch upserting ${contacts.length} contacts...`);
   
-  // First, fetch existing contacts to determine merge strategy
+  // Fetch existing contacts in chunks to avoid URL length limits
   const emails = contacts.map(c => c.email);
-  const { data: existingContacts, error: fetchError } = await supabase
-    .from('contacts')
-    .select('*')
-    .in('email', emails);
-
-  if (fetchError) {
-    console.error('Error fetching existing contacts:', fetchError);
-    throw fetchError;
-  }
-
+  const existingContacts = await fetchContactsInChunks(emails);
+  
   const existingContactsMap = new Map(
-    (existingContacts || []).map(contact => [contact.email, contact])
+    existingContacts.map(contact => [contact.email, contact])
   );
 
   // Prepare contacts for upsert with proper merging
@@ -181,6 +174,115 @@ const upsertContactBatch = async (contacts: ProcessedContact[]): Promise<void> =
   }
 
   console.log(`Successfully batch upserted ${contactsToUpsert.length} contacts`);
+};
+
+const fetchContactsInChunks = async (emails: string[]): Promise<any[]> => {
+  const chunkSize = 50; // Safe chunk size for URL length
+  const allContacts: any[] = [];
+  
+  console.log(`Fetching ${emails.length} contacts in chunks of ${chunkSize}`);
+  
+  for (let i = 0; i < emails.length; i += chunkSize) {
+    const chunk = emails.slice(i, i + chunkSize);
+    console.log(`Fetching chunk ${Math.floor(i / chunkSize) + 1}/${Math.ceil(emails.length / chunkSize)}`);
+    
+    try {
+      const { data: contacts, error } = await supabase
+        .from('contacts')
+        .select('*')
+        .in('email', chunk);
+
+      if (error) {
+        console.error('Error fetching contact chunk:', error);
+        throw error;
+      }
+
+      if (contacts) {
+        allContacts.push(...contacts);
+      }
+    } catch (error) {
+      console.error(`Error fetching contacts chunk ${i}-${i + chunkSize}:`, error);
+      throw error;
+    }
+  }
+  
+  console.log(`Successfully fetched ${allContacts.length} existing contacts`);
+  return allContacts;
+};
+
+const assignContactsToBucketChunked = async (
+  contactEmails: string[],
+  bucketId: MainBucketId
+): Promise<void> => {
+  if (!contactEmails || contactEmails.length === 0) return;
+
+  console.log(`Assigning ${contactEmails.length} contacts to bucket: ${bucketId}`);
+
+  // First, get the bucket category ID
+  const { MAIN_BUCKETS } = await import("../bucketCategorizationService");
+  const bucket = MAIN_BUCKETS[bucketId];
+  const { data: category, error: categoryError } = await supabase
+    .from('customer_categories')
+    .select('id')
+    .eq('name', bucket.name)
+    .single();
+
+  if (categoryError || !category) {
+    console.error('Error finding bucket category:', categoryError);
+    throw new Error(`Could not find bucket: ${bucket.name}`);
+  }
+
+  // Get contact IDs in chunks to avoid URL length limits
+  const chunkSize = 50;
+  const allContactIds: string[] = [];
+  
+  for (let i = 0; i < contactEmails.length; i += chunkSize) {
+    const chunk = contactEmails.slice(i, i + chunkSize);
+    console.log(`Fetching contact IDs for chunk ${Math.floor(i / chunkSize) + 1}/${Math.ceil(contactEmails.length / chunkSize)}`);
+    
+    const { data: contacts, error: contactsError } = await supabase
+      .from('contacts')
+      .select('id')
+      .in('email', chunk);
+
+    if (contactsError) {
+      console.error('Error fetching contact IDs:', contactsError);
+      throw contactsError;
+    }
+
+    if (contacts && contacts.length > 0) {
+      allContactIds.push(...contacts.map(c => c.id));
+    }
+  }
+
+  if (allContactIds.length > 0) {
+    // Create contact-category relationships in chunks
+    const relationshipChunkSize = 1000;
+    
+    for (let i = 0; i < allContactIds.length; i += relationshipChunkSize) {
+      const chunk = allContactIds.slice(i, i + relationshipChunkSize);
+      const contactCategoryRecords = chunk.map(contactId => ({
+        contact_id: contactId,
+        category_id: category.id
+      }));
+
+      const { error: assignError } = await supabase
+        .from('contact_categories')
+        .upsert(contactCategoryRecords, { 
+          onConflict: 'contact_id,category_id',
+          ignoreDuplicates: true 
+        });
+
+      if (assignError) {
+        console.error('Error assigning contacts to bucket:', assignError);
+        throw assignError;
+      }
+      
+      console.log(`Assigned chunk of ${chunk.length} contacts to ${bucket.name}`);
+    }
+
+    console.log(`Successfully assigned ${allContactIds.length} contacts to ${bucket.name}`);
+  }
 };
 
 const upsertContactWithProperMerging = async (contact: ProcessedContact): Promise<void> => {
