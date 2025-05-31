@@ -48,7 +48,7 @@ export const useOptimizedBucketCounts = () => {
             break;
           }
 
-          allBuckets = allBuckets.concat(batch.map(contact => contact.main_bucket));
+          allBuckets = allBuckets.concat(batch.map(contact => contact.main_bucket).filter(Boolean));
           console.log(`Fetched bucket batch: ${batch.length} (total: ${allBuckets.length})`);
 
           if (batch.length < batchSize) {
@@ -104,9 +104,13 @@ export const useOptimizedBucketCounts = () => {
         'cannot-place': 0
       };
 
-      bucketStats?.forEach((stat: any) => {
-        bucketCounts[stat.bucket] = stat.count;
-      });
+      if (bucketStats && Array.isArray(bucketStats)) {
+        bucketStats.forEach((stat: any) => {
+          if (stat && stat.bucket && typeof stat.count === 'number') {
+            bucketCounts[stat.bucket] = stat.count;
+          }
+        });
+      }
 
       console.log('RPC bucket counts:', bucketCounts);
       return bucketCounts;
