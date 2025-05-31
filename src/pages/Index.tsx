@@ -21,6 +21,8 @@ import { AICategorizationDialog } from "@/components/AICategorizationDialog";
 import { ContactLimitDialog } from "@/components/ContactLimitDialog";
 import type { MainBucketId } from "@/services/bucketCategorizationService";
 import { EmailCleaningProgress } from "@/components/EmailCleaningProgress";
+import { CategorizationResultsDialog } from "@/components/CategorizationResultsDialog";
+import type { CategorizationResults } from "@/services/contactCategorizationService";
 
 const Index = () => {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
@@ -100,6 +102,30 @@ const Index = () => {
     }
   };
 
+  const handleViewAllContacts = () => {
+    navigate("/contacts");
+  };
+
+  const selectedCount = allCategories
+    .filter(cat => selectedCategories.includes(cat.id))
+    .reduce((sum, cat) => sum + cat.count, 0);
+
+  const handleEmailCleaningProgress = (processed: number, total: number, validEmails: number) => {
+    setEmailCleaningProgress({
+      processed,
+      total,
+      validEmails,
+      isActive: true,
+      isComplete: false,
+      isError: false
+    });
+  };
+
+  const [showAICategorizationDialog, setShowAICategorizationDialog] = useState(false);
+  
+  const [categorizationResults, setCategorizationResults] = useState<CategorizationResults | null>(null);
+  const [showResultsDialog, setShowResultsDialog] = useState(false);
+
   // Regular rule-based categorization (NO AI, NO API KEY REQUIRED)
   const handleCategorizeAll = () => {
     setShowContactLimitDialog(true);
@@ -120,7 +146,7 @@ const Index = () => {
 
     try {
       // Call categorizeContacts with useAI = false and no API key
-      await categorizeContacts(
+      const results = await categorizeContacts(
         undefined, // contactIds
         (progress) => {
           setCategorizationProgress(progress);
@@ -130,7 +156,13 @@ const Index = () => {
         cancellationTokenRef.current,
         contactLimit // pass the contact limit
       );
+      
       queryClient.invalidateQueries({ queryKey: ["categories"] });
+      
+      // Store results and show dialog
+      setCategorizationResults(results);
+      setShowResultsDialog(true);
+      
       toast({
         title: "Categorization complete",
         description: `Contacts have been automatically categorized into appropriate buckets${contactLimit ? ` (limited to ${contactLimit} contacts)` : ''}.`,
@@ -177,7 +209,7 @@ const Index = () => {
 
     try {
       // Call categorizeContacts with useAI = true (API key will be retrieved from Supabase)
-      await categorizeContacts(
+      const results = await categorizeContacts(
         undefined, // contactIds
         (progress) => {
           setCategorizationProgress(progress);
@@ -187,7 +219,13 @@ const Index = () => {
         cancellationTokenRef.current,
         contactLimit // pass the contact limit
       );
+      
       queryClient.invalidateQueries({ queryKey: ["categories"] });
+      
+      // Store results and show dialog
+      setCategorizationResults(results);
+      setShowResultsDialog(true);
+      
       toast({
         title: "AI Categorization complete",
         description: `Contacts have been categorized using AI into personality type buckets${contactLimit ? ` (limited to ${contactLimit} contacts)` : ''}.`,
@@ -304,27 +342,6 @@ const Index = () => {
     });
   };
 
-  const handleViewAllContacts = () => {
-    navigate("/contacts");
-  };
-
-  const selectedCount = allCategories
-    .filter(cat => selectedCategories.includes(cat.id))
-    .reduce((sum, cat) => sum + cat.count, 0);
-
-  const handleEmailCleaningProgress = (processed: number, total: number, validEmails: number) => {
-    setEmailCleaningProgress({
-      processed,
-      total,
-      validEmails,
-      isActive: true,
-      isComplete: false,
-      isError: false
-    });
-  };
-
-  const [showAICategorizationDialog, setShowAICategorizationDialog] = useState(false);
-
   return (
     <div className="min-h-screen bg-gray-50">
       <EnhancedDashboardHeader
@@ -419,6 +436,13 @@ const Index = () => {
         total={emailCleaningProgress.total}
         validEmails={emailCleaningProgress.validEmails}
       />
+      
+      <CategorizationResultsDialog
+        open={showResultsDialog}
+        onOpenChange={setShowResultsDialog}
+        results={categorizationResults}
+      />
+      
     </div>
   );
 };

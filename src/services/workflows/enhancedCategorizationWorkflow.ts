@@ -1,167 +1,66 @@
-import { categorizeContactEnhanced } from "../categorization/enhancedContactProcessor";
-import { fetchCategories } from "../data/contactDataService";
+
 import { fetchUncategorizedContacts } from "../data/uncategorizedContactsService";
-import { ensureMainBucketsExist } from "../bucketCategorizationService";
-import { ensurePersonalityBucketsExist } from "../ai/openaiCategorizationService";
-import { createProgressUpdate, createInitialProgress } from "../utils/progressTracker";
-import type { ContactForCategorization } from "../types/contactTypes";
-import type { CategorizationProgress } from "../utils/progressTracker";
+import { fetchCategories } from "../data/contactDataService";
+import { categorizeContactEnhanced } from "../categorization/enhancedContactProcessor";
+import { ProgressTracker } from "../utils/progressTracker";
 import { CancellationToken } from "../utils/cancellationToken";
 
 export const runEnhancedCategorizationWorkflow = async (
   contactIds?: string[],
   useAI: boolean = false,
   openaiApiKey?: string,
-  onProgress?: (progress: CategorizationProgress) => void,
+  onProgress?: (progress: any) => void,
   cancellationToken?: CancellationToken,
   contactLimit?: number
-): Promise<void> => {
-  console.log('=== Starting enhanced contact categorization workflow ===');
-  console.log('Parameters:', { 
-    contactIds: contactIds?.length || 'all', 
-    useAI, 
-    hasApiKey: !!openaiApiKey,
-    contactLimit: contactLimit || 'unlimited'
-  });
-
+): Promise<number> => {
+  console.log('Starting enhanced categorization workflow with AI:', useAI);
+  
+  const progressTracker = new ProgressTracker(onProgress);
+  
   try {
-    // Check for cancellation at the start
-    cancellationToken?.throwIfCancelled();
+    // Fetch contacts and categories
+    const [contacts, categories] = await Promise.all([
+      contactIds ? 
+        fetchUncategorizedContacts().then(all => all.filter(c => contactIds.includes(c.id))) :
+        fetchUncategorizedContacts(contactLimit),
+      fetchCategories()
+    ]);
 
-    // Note: OpenAI initialization is now handled internally by the service when needed
-    if (useAI && !openaiApiKey) {
-      console.log('AI categorization will use API key from Supabase secrets');
+    if (!contacts.length) {
+      console.log('No contacts to categorize');
+      return 0;
     }
 
-    // Ensure main buckets exist (including "Cannot Place")
-    console.log('Ensuring main buckets exist...');
-    await ensureMainBucketsExist();
+    const totalContacts = contacts.length;
+    console.log(`Found ${totalContacts} contacts to categorize with AI: ${useAI}`);
+    
+    progressTracker.initialize(totalContacts);
 
-    // Ensure personality type buckets exist if using AI
-    if (useAI) {
-      console.log('Ensuring personality buckets exist...');
-      await ensurePersonalityBucketsExist();
-    }
-
-    // Get all categories
-    console.log('Fetching categories...');
-    const categories = await fetchCategories();
-    console.log(`Found ${categories.length} categories`);
-
-    // Show initial loading state
-    if (onProgress) {
-      onProgress(createInitialProgress());
-    }
-
-    // Get contacts that haven't been categorized yet
-    console.log('Fetching uncategorized contacts...');
-    let allContacts = await fetchUncategorizedContacts(contactIds);
-
-    // Apply contact limit if specified
-    if (contactLimit && contactLimit > 0) {
-      allContacts = allContacts.slice(0, contactLimit);
-      console.log(`Limited to ${contactLimit} contacts. Processing ${allContacts.length} contacts.`);
-    }
-
-    if (allContacts.length === 0) {
-      console.log('No uncategorized contacts to process');
-      if (onProgress) {
-        onProgress({
-          progress: 100,
-          currentBatch: 1,
-          totalBatches: 1,
-          processedCount: 0,
-          totalCount: 0
-        });
-      }
-      return;
-    }
-
-    console.log(`Total uncategorized contacts to categorize: ${allContacts.length}`);
-
-    // Use smaller batches for AI to prevent getting stuck
-    const batchSize = useAI ? 25 : 500; // Smaller AI batches
-    const parallelSize = useAI ? 3 : 50; // Lower parallel processing for AI
-    const totalBatches = Math.ceil(allContacts.length / batchSize);
+    // Process contacts individually for AI categorization (slower but more accurate)
     let processedCount = 0;
+    const totalBatches = totalContacts; // Each contact is its own "batch" for AI
 
-    console.log(`Processing with batch size: ${batchSize}, parallel size: ${parallelSize}`);
-
-    // Initial progress update with actual numbers
-    if (onProgress) {
-      onProgress(createProgressUpdate(0, allContacts.length, 1, totalBatches));
-    }
-
-    for (let i = 0; i < allContacts.length; i += batchSize) {
-      // Check for cancellation before each batch
-      cancellationToken?.throwIfCancelled();
-
-      const batch = allContacts.slice(i, i + batchSize);
-      const currentBatch = Math.floor(i / batchSize) + 1;
-      
-      console.log(`=== Processing batch ${currentBatch}/${totalBatches} with ${batch.length} contacts${useAI ? ' (using AI)' : ''} ===`);
-      
-      // Process in parallel sub-batches
-      for (let j = 0; j < batch.length; j += parallelSize) {
-        // Check for cancellation before each sub-batch
-        cancellationToken?.throwIfCancelled();
-
-        const parallelBatch = batch.slice(j, j + parallelSize);
-        
-        console.log(`Processing parallel batch: ${j + 1}-${j + parallelBatch.length} of ${batch.length}`);
-        
-        // Process this sub-batch in parallel
-        const promises = parallelBatch.map(async (contact, index) => {
-          try {
-            // Check for cancellation before processing each contact
-            cancellationToken?.throwIfCancelled();
-
-            console.log(`Processing contact ${j + index + 1}/${batch.length}: ${contact.email}`);
-            await categorizeContactEnhanced(contact as ContactForCategorization, categories, useAI);
-            console.log(`Successfully categorized: ${contact.email}`);
-            return true;
-          } catch (error) {
-            if (error instanceof Error && error.message === 'Operation was cancelled') {
-              throw error; // Re-throw cancellation errors
-            }
-            console.error(`Error categorizing contact ${contact.email}:`, error);
-            return true; // Still count as processed to avoid infinite loops
-          }
-        });
-        
-        await Promise.all(promises);
-        processedCount += parallelBatch.length;
-        
-        // Update progress more frequently for better UX
-        if (onProgress) {
-          const progressUpdate = createProgressUpdate(processedCount, allContacts.length, currentBatch, totalBatches);
-          console.log(`Progress update: ${progressUpdate.progress}% - Processed ${processedCount}/${allContacts.length} contacts`);
-          onProgress(progressUpdate);
-        }
-        
-        // Add delay for AI to respect rate limits and prevent getting stuck
-        if (useAI) {
-          console.log('Waiting 200ms before next AI batch...');
-          await new Promise(resolve => setTimeout(resolve, 200));
-        }
+    for (let i = 0; i < totalContacts; i++) {
+      // Check for cancellation
+      if (cancellationToken?.isCancelled) {
+        console.log('Enhanced categorization cancelled by user');
+        throw new Error('Operation was cancelled');
       }
+
+      const contact = contacts[i];
+      console.log(`Processing contact ${i + 1}/${totalContacts}: ${contact.email}`);
+
+      await categorizeContactEnhanced(contact, categories, useAI);
       
-      console.log(`Completed batch ${currentBatch}/${totalBatches}. Total processed: ${processedCount}/${allContacts.length} contacts`);
+      processedCount++;
+      progressTracker.updateProgress(processedCount, i + 1, totalBatches);
     }
 
-    // Final progress update
-    if (onProgress) {
-      const finalProgress = createProgressUpdate(processedCount, allContacts.length, totalBatches, totalBatches);
-      onProgress(finalProgress);
-    }
-
-    console.log(`=== Enhanced contact categorization completed. Processed ${processedCount} contacts total. ===`);
+    console.log(`Enhanced categorization workflow completed. Processed ${processedCount} contacts.`);
+    return processedCount;
+    
   } catch (error) {
-    if (error instanceof Error && error.message === 'Operation was cancelled') {
-      console.log('=== Categorization was cancelled by user ===');
-      throw error;
-    }
-    console.error('=== ERROR in enhanced categorization workflow ===', error);
+    console.error('Error in enhanced categorization workflow:', error);
     throw error;
   }
 };

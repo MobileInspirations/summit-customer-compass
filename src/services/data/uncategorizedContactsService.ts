@@ -1,11 +1,13 @@
 
 import { supabase } from "@/integrations/supabase/client";
 
-export const fetchUncategorizedContacts = async (contactIds?: string[], limit?: number) => {
-  console.log(`Fetching uncategorized contacts${limit ? ` with limit: ${limit}` : ' (no limit)'}`);
+export const fetchUncategorizedContacts = async (contactLimit?: number) => {
+  console.log(`Fetching uncategorized contacts with limit: ${contactLimit}`);
   
-  // If specific contact IDs are provided, filter by them
-  if (contactIds && contactIds.length > 0) {
+  // If we have a specific limit under 1000, use it in the query for efficiency
+  if (contactLimit && contactLimit < 1000) {
+    console.log(`Using SQL limit for efficient query: ${contactLimit}`);
+    
     const { data: contacts, error } = await supabase
       .from('contacts')
       .select(`
@@ -13,23 +15,28 @@ export const fetchUncategorizedContacts = async (contactIds?: string[], limit?: 
         email, 
         full_name, 
         company, 
+        tags, 
         summit_history
       `)
-      .in('id', contactIds);
+      .limit(contactLimit);
 
     if (error) {
-      console.error('Error fetching specific contacts:', error);
+      console.error('Error fetching limited contacts:', error);
       throw error;
     }
 
-    console.log(`Found ${contacts?.length || 0} specific contacts`);
+    console.log(`Successfully fetched ${contacts?.length || 0} contacts with SQL limit`);
     return contacts || [];
   }
 
-  // If we have a limit under 1000, we can optimize by using the limit directly in the query
-  if (limit && limit < 1000) {
-    console.log(`Using optimized query with limit ${limit}`);
-    
+  // For larger limits or unlimited, fetch all and then slice if needed
+  console.log('Fetching all contacts and applying limit in memory');
+  
+  let allContacts: any[] = [];
+  let from = 0;
+  const batchSize = 1000;
+  
+  while (true) {
     const { data: contacts, error } = await supabase
       .from('contacts')
       .select(`
@@ -37,98 +44,38 @@ export const fetchUncategorizedContacts = async (contactIds?: string[], limit?: 
         email, 
         full_name, 
         company, 
-        summit_history,
-        contact_categories!left (contact_id)
+        tags, 
+        summit_history
       `)
-      .is('contact_categories.contact_id', null)
-      .order('created_at', { ascending: true })
-      .limit(limit);
+      .range(from, from + batchSize - 1);
 
     if (error) {
-      console.error('Error fetching uncategorized contacts with limit:', error);
-      throw error;
-    }
-
-    // Transform the data to remove the join column
-    const uncategorizedContacts = (contacts || []).map(contact => ({
-      id: contact.id,
-      email: contact.email,
-      full_name: contact.full_name,
-      company: contact.company,
-      summit_history: contact.summit_history
-    }));
-
-    console.log(`Fetched ${uncategorizedContacts.length} uncategorized contacts with limit ${limit}`);
-    return uncategorizedContacts;
-  }
-
-  // For large datasets or no limit, we need to fetch in batches due to Supabase limitations
-  let allUncategorizedContacts: any[] = [];
-  let hasMore = true;
-  let offset = 0;
-  const batchSize = 1000; // Supabase's effective limit
-
-  while (hasMore && (!limit || allUncategorizedContacts.length < limit)) {
-    console.log(`Fetching batch starting at offset ${offset}, total fetched so far: ${allUncategorizedContacts.length}`);
-    
-    // Use a LEFT JOIN approach to find uncategorized contacts more efficiently
-    const { data: contacts, error } = await supabase
-      .from('contacts')
-      .select(`
-        id, 
-        email, 
-        full_name, 
-        company, 
-        summit_history,
-        contact_categories!left (contact_id)
-      `)
-      .is('contact_categories.contact_id', null)
-      .range(offset, offset + batchSize - 1)
-      .order('created_at', { ascending: true }); // Add consistent ordering
-
-    if (error) {
-      console.error('Error fetching uncategorized contacts batch:', error);
+      console.error('Error fetching contacts batch:', error);
       throw error;
     }
 
     if (!contacts || contacts.length === 0) {
-      console.log('No more contacts found, stopping fetch');
-      hasMore = false;
       break;
     }
 
-    // Transform the data to remove the join column
-    const batchUncategorizedContacts = contacts.map(contact => ({
-      id: contact.id,
-      email: contact.email,
-      full_name: contact.full_name,
-      company: contact.company,
-      summit_history: contact.summit_history
-    }));
+    allContacts = allContacts.concat(contacts);
+    console.log(`Fetched batch: ${contacts.length} contacts (total so far: ${allContacts.length})`);
 
-    allUncategorizedContacts = allUncategorizedContacts.concat(batchUncategorizedContacts);
-    console.log(`Fetched batch of ${contacts.length} contacts. Total so far: ${allUncategorizedContacts.length}`);
+    // If we have a limit and we've reached it, break early
+    if (contactLimit && allContacts.length >= contactLimit) {
+      allContacts = allContacts.slice(0, contactLimit);
+      console.log(`Reached contact limit, returning ${allContacts.length} contacts`);
+      break;
+    }
 
     // If we got less than the batch size, we've reached the end
     if (contacts.length < batchSize) {
-      console.log(`Got ${contacts.length} contacts (less than batch size ${batchSize}), stopping fetch`);
-      hasMore = false;
+      break;
     }
 
-    // If we have a limit and we've reached it, stop
-    if (limit && allUncategorizedContacts.length >= limit) {
-      allUncategorizedContacts = allUncategorizedContacts.slice(0, limit);
-      hasMore = false;
-    }
-
-    offset += batchSize;
-
-    // Add a small delay to avoid overwhelming Supabase
-    if (hasMore) {
-      await new Promise(resolve => setTimeout(resolve, 50));
-    }
+    from += batchSize;
   }
 
-  console.log(`Finished fetching. Total uncategorized contacts: ${allUncategorizedContacts.length}${limit ? ` (limit was ${limit})` : ' (no limit)'}`);
-  return allUncategorizedContacts;
+  console.log(`Final result: ${allContacts.length} contacts`);
+  return allContacts;
 };
