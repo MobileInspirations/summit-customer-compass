@@ -10,19 +10,24 @@ interface BucketCountResult {
 
 type BucketKey = 'biz-op' | 'health' | 'survivalist' | 'cannot-place';
 
+// Type guard to check if a string is a valid bucket key
+const isBucketKey = (key: string): key is BucketKey => {
+  return ['biz-op', 'health', 'survivalist', 'cannot-place'].includes(key);
+};
+
 export const useOptimizedBucketCounts = () => {
   return useQuery({
     queryKey: ["optimized-bucket-counts"],
     queryFn: async (): Promise<Record<BucketKey, number>> => {
       console.log('=== Starting optimized bucket counts calculation ===');
       
-      // Initialize bucket counts
-      const bucketCounts: Record<BucketKey, number> = {
+      // Initialize bucket counts with explicit typing
+      const bucketCounts = {
         'biz-op': 0,
         'health': 0,
         'survivalist': 0,
         'cannot-place': 0
-      };
+      } as Record<BucketKey, number>;
 
       // Get total count first for verification
       const { count: totalCount, error: countError } = await supabase
@@ -37,22 +42,24 @@ export const useOptimizedBucketCounts = () => {
       console.log('Total contacts in database:', totalCount);
 
       // Try to use RPC function first
-      const { data: bucketStats, error: rpcError } = await supabase
+      const { data: rpcData, error: rpcError } = await supabase
         .rpc('get_bucket_counts');
 
-      if (!rpcError && bucketStats) {
-        // Process RPC results
+      if (!rpcError && rpcData) {
+        // Process RPC results with explicit typing
         console.log('Using RPC function for bucket counts');
         
+        // Type the RPC data properly
+        const bucketStats = rpcData as BucketCountResult[];
+        
         if (Array.isArray(bucketStats)) {
-          bucketStats.forEach((stat: any) => {
+          for (const stat of bucketStats) {
             if (stat && typeof stat.bucket === 'string' && typeof stat.count === 'number') {
-              const bucketKey = stat.bucket as BucketKey;
-              if (bucketKey in bucketCounts) {
-                bucketCounts[bucketKey] = stat.count;
+              if (isBucketKey(stat.bucket)) {
+                bucketCounts[stat.bucket] = stat.count;
               }
             }
-          });
+          }
         }
 
         console.log('RPC bucket counts:', bucketCounts);
