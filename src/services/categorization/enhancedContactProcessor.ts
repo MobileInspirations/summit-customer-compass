@@ -15,70 +15,28 @@ export const categorizeContactEnhanced = async (
   const assignedCategories: string[] = [];
 
   try {
-    // First, assign to main buckets (Business Operations, Health, Survivalist) using existing logic
-    const mainBuckets = categories.filter(cat => 
-      cat.name === 'Business Operations' || 
-      cat.name === 'Health' || 
-      cat.name === 'Survivalist'
+    // NEVER assign to main buckets during categorization - only during upload
+    // Main buckets are: Business Operations, Health, Survivalist, Cannot Place
+    
+    // Only assign to other customer categories (not main buckets)
+    const otherCustomerCategories = categories.filter(cat => 
+      cat.name !== 'Business Operations' && 
+      cat.name !== 'Health' && 
+      cat.name !== 'Survivalist' &&
+      cat.name !== 'Cannot Place' &&
+      cat.category_type === 'customer'
     );
 
-    console.log(`Found ${mainBuckets.length} main buckets`);
+    console.log(`Checking ${otherCustomerCategories.length} non-main-bucket customer categories`);
 
-    for (const category of mainBuckets) {
+    for (const category of otherCustomerCategories) {
       if (shouldAssignToCategory(contact, category)) {
         assignedCategories.push(category.id);
-        console.log(`Assigned to main bucket: ${category.name}`);
+        console.log(`Assigned to customer category: ${category.name}`);
       }
     }
 
-    // If assigned to main buckets, also check for other customer categories
-    if (assignedCategories.length > 0) {
-      const otherCategories = categories.filter(cat => 
-        cat.name !== 'Business Operations' && 
-        cat.name !== 'Health' && 
-        cat.name !== 'Survivalist' &&
-        cat.name !== 'Cannot Place' &&
-        cat.category_type === 'customer'
-      );
-
-      console.log(`Checking ${otherCategories.length} other customer categories`);
-
-      for (const category of otherCategories) {
-        if (shouldAssignToCategory(contact, category)) {
-          assignedCategories.push(category.id);
-          console.log(`Also assigned to customer category: ${category.name}`);
-        }
-      }
-    } else {
-      // If no main bucket matched, try all other customer categories except "Cannot Place"
-      const otherCategories = categories.filter(cat => 
-        cat.name !== 'Business Operations' && 
-        cat.name !== 'Health' && 
-        cat.name !== 'Survivalist' &&
-        cat.name !== 'Cannot Place' &&
-        cat.category_type === 'customer'
-      );
-
-      console.log(`No main bucket matched, checking ${otherCategories.length} other categories`);
-
-      for (const category of otherCategories) {
-        if (shouldAssignToCategory(contact, category)) {
-          assignedCategories.push(category.id);
-          console.log(`Assigned to other category: ${category.name}`);
-        }
-      }
-
-      // If still no categories matched, assign to "Cannot Place" category
-      if (assignedCategories.length === 0) {
-        const cannotPlaceCategory = categories.find(cat => cat.name === 'Cannot Place');
-        if (cannotPlaceCategory) {
-          assignedCategories.push(cannotPlaceCategory.id);
-          console.log(`Assigned contact ${contact.email} to "Cannot Place" category`);
-        }
-      }
-    }
-
-    // Now handle personality type categorization
+    // Handle personality type categorization
     if (useAI) {
       console.log('Starting AI personality categorization...');
       try {
@@ -125,9 +83,9 @@ export const categorizeContactEnhanced = async (
       }
     }
 
-    // Insert contact-category relationships
+    // Insert contact-category relationships for non-main-bucket categories only
     if (assignedCategories.length > 0) {
-      console.log(`Inserting ${assignedCategories.length} contact-category relationships`);
+      console.log(`Inserting ${assignedCategories.length} contact-category relationships (excluding main buckets)`);
       
       const contactCategoryRecords = assignedCategories.map(categoryId => ({
         contact_id: contact.id,
@@ -145,10 +103,10 @@ export const categorizeContactEnhanced = async (
         console.error(`Error categorizing contact ${contact.email}:`, error);
         throw error;
       } else {
-        console.log(`Successfully assigned contact ${contact.email} to ${assignedCategories.length} categories`);
+        console.log(`Successfully assigned contact ${contact.email} to ${assignedCategories.length} non-main-bucket categories`);
       }
     } else {
-      console.log(`No categories matched for contact: ${contact.email}`);
+      console.log(`No non-main-bucket categories matched for contact: ${contact.email}`);
     }
   } catch (error) {
     console.error(`Error in categorizeContactEnhanced for ${contact.email}:`, error);

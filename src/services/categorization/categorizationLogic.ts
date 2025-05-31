@@ -8,43 +8,11 @@ export const shouldAssignToCategory = (contact: ContactForCategorization, catego
   const company = contact.company?.toLowerCase() || '';
   const email = contact.email.toLowerCase();
 
-  // Main bucket categorization - assign contacts to appropriate main buckets
-  if (categoryName === 'business operations' || categoryName === 'biz-op') {
-    return company !== '' || 
-           email.includes('@business') || 
-           email.includes('@corp') || 
-           email.includes('@company') ||
-           email.includes('@inc') ||
-           email.includes('@llc') ||
-           summitHistory.some(event => 
-             event.toLowerCase().includes('business') ||
-             event.toLowerCase().includes('entrepreneur') ||
-             event.toLowerCase().includes('marketing') ||
-             event.toLowerCase().includes('sales')
-           );
-  }
+  // IMPORTANT: Main bucket categorization should ONLY happen during upload, never during categorization
+  // Main buckets are: Business Operations, Health, Survivalist, Cannot Place
+  // This function should not assign to main buckets during categorization
 
-  if (categoryName === 'health') {
-    return summitHistory.some(event => 
-      event.toLowerCase().includes('health') ||
-      event.toLowerCase().includes('medical') ||
-      event.toLowerCase().includes('wellness') ||
-      event.toLowerCase().includes('nutrition') ||
-      event.toLowerCase().includes('fitness')
-    ) || email.includes('health') || email.includes('medical');
-  }
-
-  if (categoryName === 'survivalist') {
-    return summitHistory.some(event => 
-      event.toLowerCase().includes('survival') ||
-      event.toLowerCase().includes('preparedness') ||
-      event.toLowerCase().includes('emergency') ||
-      event.toLowerCase().includes('prepper') ||
-      event.toLowerCase().includes('tactical')
-    ) || email.includes('survival') || email.includes('prepper');
-  }
-
-  // Customer type categorization
+  // Customer type categorization (excluding main buckets)
   if (category.category_type === 'customer') {
     // High-value customers
     if (categoryName.includes('vip') || categoryName.includes('premium')) {
