@@ -38,20 +38,33 @@ export const useBucketCounts = () => {
             continue;
           }
 
-          // Get all contact_category records for this category
-          const { data: contactCategories, error: countError } = await supabase
+          // Get count of all contact_category records for this category
+          const { count: totalRecords, error: countError } = await supabase
             .from('contact_categories')
-            .select('contact_id')
+            .select('contact_id', { count: 'exact', head: true })
             .eq('category_id', category.id);
 
           if (countError) {
             console.error('Error counting contacts for bucket:', bucket.id, countError);
             bucketCounts[bucket.id] = 0;
+            continue;
+          }
+
+          // Get all contact_category records for this category to count unique contacts
+          const { data: contactCategories, error: dataError } = await supabase
+            .from('contact_categories')
+            .select('contact_id')
+            .eq('category_id', category.id)
+            .not('contact_id', 'is', null);
+
+          if (dataError) {
+            console.error('Error fetching contact data for bucket:', bucket.id, dataError);
+            bucketCounts[bucket.id] = 0;
           } else {
             // Count unique contact IDs
             const uniqueContactIds = new Set(contactCategories?.map(cc => cc.contact_id) || []);
             bucketCounts[bucket.id] = uniqueContactIds.size;
-            console.log(`Bucket ${bucket.id}: ${contactCategories?.length || 0} total records, ${uniqueContactIds.size} unique contacts`);
+            console.log(`Bucket ${bucket.id}: ${totalRecords || 0} total records, ${uniqueContactIds.size} unique contacts`);
           }
         } catch (error) {
           console.error(`Error processing bucket ${bucket.id}:`, error);
