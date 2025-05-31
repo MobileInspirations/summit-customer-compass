@@ -21,20 +21,41 @@ export const useCategories = () => {
         throw error;
       }
 
-      // Get contact counts for each category
+      // Get contact counts for each category with pagination
       const categoriesWithCounts = await Promise.all(
         categories.map(async (category) => {
-          const { count, error: countError } = await supabase
-            .from("contact_categories")
-            .select("*", { count: "exact", head: true })
-            .eq("category_id", category.id);
+          let totalCount = 0;
+          let from = 0;
+          const batchSize = 1000;
 
-          if (countError) {
-            console.error("Error counting contacts for category:", category.id, countError);
-            return { ...category, count: 0 };
+          while (true) {
+            const { count, error: countError } = await supabase
+              .from("contact_categories")
+              .select("*", { count: "exact", head: true })
+              .eq("category_id", category.id)
+              .range(from, from + batchSize - 1);
+
+            if (countError) {
+              console.error("Error counting contacts for category:", category.id, countError);
+              break;
+            }
+
+            if (!count || count === 0) {
+              break;
+            }
+
+            totalCount += count;
+
+            // If we got less than the batch size, we've reached the end
+            if (count < batchSize) {
+              break;
+            }
+
+            from += batchSize;
           }
 
-          return { ...category, count: count || 0 };
+          console.log(`Category ${category.name}: ${totalCount} contacts`);
+          return { ...category, count: totalCount };
         })
       );
 
