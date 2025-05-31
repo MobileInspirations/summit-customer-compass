@@ -8,6 +8,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Card, CardContent } from "@/components/ui/card";
 
 interface EnhancedDashboardHeaderProps {
   onUploadClick: () => void;
@@ -22,6 +23,8 @@ interface EnhancedDashboardHeaderProps {
   isSorting: boolean;
   isExporting: boolean;
   isCategorizing: boolean;
+  contactsCount?: number;
+  categoriesCount?: number;
 }
 
 export const EnhancedDashboardHeader = ({
@@ -36,11 +39,14 @@ export const EnhancedDashboardHeader = ({
   selectedCategoriesCount,
   isSorting,
   isExporting,
-  isCategorizing
+  isCategorizing,
+  contactsCount = 0,
+  categoriesCount = 0
 }: EnhancedDashboardHeaderProps) => {
   return (
     <div className="bg-white shadow-sm border-b">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Top Section with Title and Actions */}
         <div className="flex justify-between items-center py-6">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Customer Categories Dashboard</h1>
@@ -56,41 +62,42 @@ export const EnhancedDashboardHeader = ({
               Upload CSV
             </Button>
             
+            <Button onClick={onViewAllContacts} variant="outline">
+              <Users className="w-4 h-4 mr-2" />
+              View Contacts
+            </Button>
+            
             {/* Categorization Actions */}
-            <div className="flex items-center space-x-2 border-l pl-3">
-              <Button 
-                onClick={onCategorizeAll} 
-                variant="outline"
-                disabled={isCategorizing}
-                className="bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
-              >
-                <Tags className="w-4 h-4 mr-2" />
-                {isCategorizing ? "Categorizing..." : "Auto Categorize"}
-              </Button>
+            <Button 
+              onClick={onCategorizeAll} 
+              variant="outline"
+              disabled={isCategorizing}
+              className="bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
+            >
+              <Tags className="w-4 h-4 mr-2" />
+              Auto Categorize
+            </Button>
 
-              <Button 
-                onClick={onAICategorizeAll} 
-                variant="outline"
-                disabled={isCategorizing}
-                className="bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200"
-              >
-                <Brain className="w-4 h-4 mr-2" />
-                {isCategorizing ? "AI Processing..." : "AI Categorize"}
-              </Button>
-            </div>
+            <Button 
+              onClick={onAICategorizeAll} 
+              variant="outline"
+              disabled={isCategorizing}
+              className="bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200"
+            >
+              <Brain className="w-4 h-4 mr-2" />
+              AI Categorize
+            </Button>
             
             {/* Export Actions */}
-            <div className="flex items-center space-x-2 border-l pl-3">
-              <Button 
-                onClick={onExport} 
-                variant="outline"
-                disabled={selectedCategoriesCount === 0}
-                className="bg-orange-50 hover:bg-orange-100 text-orange-700 border-orange-200"
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Export Selected ({selectedCategoriesCount})
-              </Button>
-            </div>
+            <Button 
+              onClick={onExport} 
+              variant="outline"
+              disabled={selectedCategoriesCount === 0}
+              className="bg-orange-50 hover:bg-orange-100 text-orange-700 border-orange-200"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Export Selected ({selectedCategoriesCount})
+            </Button>
             
             {/* More Actions Menu */}
             <DropdownMenu>
@@ -100,11 +107,6 @@ export const EnhancedDashboardHeader = ({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48 bg-white">
-                <DropdownMenuItem onClick={onViewAllContacts}>
-                  <Users className="w-4 h-4 mr-2" />
-                  View All Contacts
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
                 <DropdownMenuItem 
                   onClick={onSortContacts}
                   disabled={isSorting}
@@ -126,6 +128,72 @@ export const EnhancedDashboardHeader = ({
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+          </div>
+        </div>
+
+        {/* Stats Cards Section */}
+        <div className="pb-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Total Contacts */}
+            <Card className="bg-gray-50 border-gray-200">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Total Contacts</p>
+                    <p className="text-2xl font-bold text-gray-900">{contactsCount.toLocaleString()}</p>
+                  </div>
+                  <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center">
+                    <Users className="w-4 h-4 text-gray-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Categories */}
+            <Card className="bg-gray-50 border-gray-200">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Categories</p>
+                    <p className="text-2xl font-bold text-gray-900">{categoriesCount}</p>
+                  </div>
+                  <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center">
+                    <Tags className="w-4 h-4 text-gray-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Selected */}
+            <Card className="bg-gray-50 border-gray-200">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Selected</p>
+                    <p className="text-2xl font-bold text-gray-900">{selectedCategoriesCount}</p>
+                  </div>
+                  <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center">
+                    <ArrowUpDown className="w-4 h-4 text-gray-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Export Files */}
+            <Card className="bg-gray-50 border-gray-200">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Export Files</p>
+                    <p className="text-2xl font-bold text-gray-900">0</p>
+                    <p className="text-xs text-gray-500">(max 25k per file)</p>
+                  </div>
+                  <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center">
+                    <Download className="w-4 h-4 text-gray-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>
