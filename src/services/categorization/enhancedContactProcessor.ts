@@ -14,8 +14,8 @@ export const categorizeContactEnhanced = async (
   const assignedCategories: string[] = [];
 
   try {
-    // NEVER assign to main buckets during categorization - only during upload
-    // Main buckets are: Business Operations, Health, Survivalist, Cannot Place
+    // IMPORTANT: NEVER assign to main buckets during categorization - only during upload
+    // Main buckets (Business Operations, Health, Survivalist) are set during upload and should NEVER be changed
     
     // Only assign to other customer categories (not main buckets)
     const otherCustomerCategories = categories.filter(cat => 
@@ -84,7 +84,7 @@ export const categorizeContactEnhanced = async (
 
     // Insert contact-category relationships for non-main-bucket categories only
     if (assignedCategories.length > 0) {
-      console.log(`Inserting ${assignedCategories.length} contact-category relationships (excluding main buckets)`);
+      console.log(`Inserting ${assignedCategories.length} contact-category relationships (excluding main buckets - they remain unchanged)`);
       
       const contactCategoryRecords = assignedCategories.map(categoryId => ({
         contact_id: contact.id,
@@ -102,10 +102,10 @@ export const categorizeContactEnhanced = async (
         console.error(`Error categorizing contact ${contact.email}:`, error);
         throw error;
       } else {
-        console.log(`Successfully assigned contact ${contact.email} to ${assignedCategories.length} non-main-bucket categories`);
+        console.log(`Successfully assigned contact ${contact.email} to ${assignedCategories.length} non-main-bucket categories (main bucket unchanged)`);
       }
     } else {
-      console.log(`No non-main-bucket categories matched for contact: ${contact.email}`);
+      console.log(`No non-main-bucket categories matched for contact: ${contact.email} (main bucket remains unchanged)`);
     }
   } catch (error) {
     console.error(`Error in categorizeContactEnhanced for ${contact.email}:`, error);

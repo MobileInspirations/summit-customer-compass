@@ -14,7 +14,10 @@ export const categorizeContact = async (
   const assignedCategories: string[] = [];
 
   try {
-    // Use the mandatory bucket categorization system with summit history
+    // IMPORTANT: Never assign to main buckets during categorization
+    // Main buckets (Business Operations, Health, Survivalist) are set during upload and should never be changed
+    
+    // Use the mandatory bucket categorization system with summit history for personality buckets only
     const allTags = contact.summit_history || [];
 
     const contactForRules: ContactForRuleCategorization = {
@@ -29,34 +32,17 @@ export const categorizeContact = async (
     const mandatoryResult = categorizeContactMandatoryBuckets(contactForRules);
     console.log(`Mandatory categorization for ${contact.email}: Main=${mandatoryResult.mainBucket}, Personality=${mandatoryResult.personalityBucket}`);
 
-    // Find matching categories for the mandatory buckets
-    const mainBucketCategory = categories.find(cat => 
-      cat.name === mandatoryResult.mainBucket && cat.category_type === 'customer'
-    );
+    // ONLY assign to personality bucket categories - NEVER main bucket categories
     const personalityBucketCategory = categories.find(cat => 
       cat.name === mandatoryResult.personalityBucket && cat.category_type === 'personality'
     );
 
     console.log(`Available categories:`, categories.map(c => `${c.name} (${c.category_type})`));
-    console.log(`Looking for main bucket: "${mandatoryResult.mainBucket}" with type "customer"`);
     console.log(`Looking for personality bucket: "${mandatoryResult.personalityBucket}" with type "personality"`);
-    console.log(`Found main bucket category:`, mainBucketCategory);
     console.log(`Found personality bucket category:`, personalityBucketCategory);
 
-    if (mainBucketCategory) {
-      assignedCategories.push(mainBucketCategory.id);
-      console.log(`Assigned to main bucket: ${mainBucketCategory.name}`);
-    } else {
-      console.warn(`Main bucket category not found: ${mandatoryResult.mainBucket}`);
-      // Find Business Operations as fallback (never "Cannot Place")
-      const businessOpsCategory = categories.find(cat => 
-        cat.name === 'Business Operations' && cat.category_type === 'customer'
-      );
-      if (businessOpsCategory) {
-        assignedCategories.push(businessOpsCategory.id);
-        console.log(`Assigned to Business Operations fallback`);
-      }
-    }
+    // DO NOT assign to main bucket categories - they are already set during upload
+    console.log(`Skipping main bucket assignment - main bucket was set during upload and should not be changed`);
 
     if (personalityBucketCategory) {
       assignedCategories.push(personalityBucketCategory.id);
@@ -73,11 +59,11 @@ export const categorizeContact = async (
       }
     }
 
-    // Insert contact-category relationships
+    // Insert contact-category relationships ONLY for personality categories
     if (assignedCategories.length > 0) {
-      console.log(`Inserting ${assignedCategories.length} contact-category relationships for ${contact.email}`);
+      console.log(`Inserting ${assignedCategories.length} contact-category relationships for ${contact.email} (personality categories only)`);
       
-      // First, remove any existing categorizations for this contact
+      // First, remove any existing categorizations for this contact (only personality categories)
       const { error: deleteError } = await supabase
         .from('contact_categories')
         .delete()
@@ -87,7 +73,7 @@ export const categorizeContact = async (
         console.error(`Error removing existing categories for ${contact.email}:`, deleteError);
       }
 
-      // Then insert the new categorizations
+      // Then insert the new categorizations (only personality categories)
       const contactCategoryRecords = assignedCategories.map(categoryId => ({
         contact_id: contact.id,
         category_id: categoryId
@@ -103,10 +89,10 @@ export const categorizeContact = async (
         console.error(`Error categorizing contact ${contact.email}:`, error);
         throw error;
       } else {
-        console.log(`Successfully assigned contact ${contact.email} to ${assignedCategories.length} categories`);
+        console.log(`Successfully assigned contact ${contact.email} to ${assignedCategories.length} personality categories (main bucket unchanged)`);
       }
     } else {
-      console.error(`No categories could be assigned for contact: ${contact.email}`);
+      console.log(`No personality categories could be assigned for contact: ${contact.email} (main bucket remains unchanged)`);
     }
   } catch (error) {
     console.error(`Error in categorizeContact for ${contact.email}:`, error);
