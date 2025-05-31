@@ -8,18 +8,39 @@ export const useBucketCounts = () => {
     queryFn: async () => {
       console.log('=== Starting bucket counts calculation ===');
       
-      // Get all contacts with their main_bucket values
-      const { data: allContacts, error } = await supabase
-        .from("contacts")
-        .select("main_bucket");
+      // Get all contacts with pagination to handle large datasets
+      let allContacts: any[] = [];
+      let from = 0;
+      const batchSize = 1000;
+      
+      while (true) {
+        const { data: contacts, error } = await supabase
+          .from("contacts")
+          .select("main_bucket")
+          .range(from, from + batchSize - 1);
 
-      if (error) {
-        console.error("Error fetching contacts for bucket counts:", error);
-        throw error;
+        if (error) {
+          console.error("Error fetching contacts for bucket counts:", error);
+          throw error;
+        }
+
+        if (!contacts || contacts.length === 0) {
+          break; // No more contacts to fetch
+        }
+
+        allContacts = allContacts.concat(contacts);
+        console.log(`Fetched batch: ${contacts.length} contacts (total so far: ${allContacts.length})`);
+
+        // If we got less than the batch size, we've reached the end
+        if (contacts.length < batchSize) {
+          break;
+        }
+
+        from += batchSize;
       }
 
-      console.log('Total contacts fetched for bucket counting:', allContacts?.length);
-      console.log('Sample contact main_bucket values:', allContacts?.slice(0, 10).map(c => c.main_bucket));
+      console.log('Total contacts fetched for bucket counting:', allContacts.length);
+      console.log('Sample contact main_bucket values:', allContacts.slice(0, 10).map(c => c.main_bucket));
 
       // Count contacts by main_bucket with comprehensive normalization
       const bucketCounts: Record<string, number> = {
@@ -29,7 +50,7 @@ export const useBucketCounts = () => {
         'cannot-place': 0
       };
 
-      allContacts?.forEach(contact => {
+      allContacts.forEach(contact => {
         const bucket = contact.main_bucket?.toLowerCase() || '';
         console.log('Processing contact with bucket:', bucket);
         
