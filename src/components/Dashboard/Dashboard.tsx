@@ -33,12 +33,12 @@ export const Dashboard = () => {
   const exportState = useExportState();
   const categorizationState = useCategorizationState();
 
-  const { data: contactsCount } = useQuery({
+  const { data: contactsCount, refetch: refetchContactsCount } = useQuery({
     queryKey: ["contacts-count"],
     queryFn: fetchContactsCount,
   });
 
-  const { data: totalUniqueContacts = 0 } = useTotalUniqueContacts();
+  const { data: totalUniqueContacts = 0, refetch: refetchUniqueContacts } = useTotalUniqueContacts();
 
   const { data: allCategories = [] } = useQuery({
     queryKey: ["categories"],
@@ -47,7 +47,7 @@ export const Dashboard = () => {
 
   const { data: customerCategories = [] } = useCategoriesByType("customer");
   const { data: personalityCategories = [] } = useCategoriesByType("personality");
-  const { data: bucketCounts = {} } = useBucketCounts();
+  const { data: bucketCounts = {}, refetch: refetchBucketCounts } = useBucketCounts();
 
   const exportHandlers = useExportHandlers({
     setIsExporting: exportState.setIsExporting,
@@ -102,6 +102,13 @@ export const Dashboard = () => {
     if (canExport) {
       dialogState.setShowExportDialog(true);
     }
+  };
+
+  const handleUploadComplete = () => {
+    // Refresh all counts after upload
+    refetchContactsCount();
+    refetchUniqueContacts();
+    refetchBucketCounts();
   };
 
   return (
@@ -161,6 +168,7 @@ export const Dashboard = () => {
         exportState={exportState}
         categorizationState={categorizationState}
         categorizationHandlers={categorizationHandlers}
+        onUploadComplete={handleUploadComplete}
       />
 
       <ProgressBars
