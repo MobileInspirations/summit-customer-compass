@@ -2,6 +2,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
+// Define the expected RPC return type
+interface BucketCountResult {
+  bucket: string;
+  count: number;
+}
+
 export const useOptimizedBucketCounts = () => {
   return useQuery({
     queryKey: ["optimized-bucket-counts"],
@@ -20,9 +26,9 @@ export const useOptimizedBucketCounts = () => {
 
       console.log('Total contacts in database:', totalCount);
 
-      // Use database aggregation with proper SQL - fix type inference
-      const rpcResult = await supabase.rpc('get_bucket_counts');
-      const { data: bucketStats, error } = rpcResult;
+      // Use database aggregation with proper typing
+      const { data: bucketStats, error }: { data: BucketCountResult[] | null; error: any } = await supabase
+        .rpc('get_bucket_counts');
 
       if (error) {
         console.warn("RPC function not available, falling back to manual counting:", error);
@@ -112,7 +118,7 @@ export const useOptimizedBucketCounts = () => {
 
       // Process bucketStats if available
       if (bucketStats && Array.isArray(bucketStats)) {
-        bucketStats.forEach((stat: any) => {
+        bucketStats.forEach((stat: BucketCountResult) => {
           if (stat && stat.bucket && typeof stat.count === 'number') {
             bucketCounts[stat.bucket] = stat.count;
           }
