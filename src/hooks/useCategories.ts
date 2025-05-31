@@ -21,39 +21,44 @@ export const useCategories = () => {
         throw error;
       }
 
-      // Get contact counts for each category with pagination
+      // Get contact counts for each category by actually fetching all relationship records
       const categoriesWithCounts = await Promise.all(
         categories.map(async (category) => {
-          let totalCount = 0;
+          console.log(`Counting contacts for category: ${category.name} (${category.id})`);
+          
+          // Fetch all contact_categories records for this category in batches
+          let allRelationships: any[] = [];
           let from = 0;
           const batchSize = 1000;
 
           while (true) {
-            const { count, error: countError } = await supabase
+            const { data: batch, error: fetchError } = await supabase
               .from("contact_categories")
-              .select("*", { count: "exact", head: true })
+              .select("contact_id")
               .eq("category_id", category.id)
               .range(from, from + batchSize - 1);
 
-            if (countError) {
-              console.error("Error counting contacts for category:", category.id, countError);
+            if (fetchError) {
+              console.error("Error fetching contact relationships for category:", category.id, fetchError);
               break;
             }
 
-            if (!count || count === 0) {
+            if (!batch || batch.length === 0) {
               break;
             }
 
-            totalCount += count;
+            allRelationships = allRelationships.concat(batch);
+            console.log(`Fetched batch for ${category.name}: ${batch.length} relationships (total so far: ${allRelationships.length})`);
 
             // If we got less than the batch size, we've reached the end
-            if (count < batchSize) {
+            if (batch.length < batchSize) {
               break;
             }
 
             from += batchSize;
           }
 
+          const totalCount = allRelationships.length;
           console.log(`Category ${category.name}: ${totalCount} contacts`);
           return { ...category, count: totalCount };
         })
