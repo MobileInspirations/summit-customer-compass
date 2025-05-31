@@ -1,3 +1,4 @@
+
 import { categorizeContact } from "../categorization/contactProcessor";
 import { fetchCategories } from "../data/contactDataService";
 import { fetchUncategorizedContacts } from "../data/uncategorizedContactsService";
@@ -10,9 +11,14 @@ import { CancellationToken } from "../utils/cancellationToken";
 export const runCategorizationWorkflow = async (
   contactIds?: string[],
   onProgress?: (progress: CategorizationProgress) => void,
-  cancellationToken?: CancellationToken
+  cancellationToken?: CancellationToken,
+  contactLimit?: number
 ): Promise<void> => {
   console.log('Starting contact categorization workflow...');
+  console.log('Parameters:', { 
+    contactIds: contactIds?.length || 'all',
+    contactLimit: contactLimit || 'unlimited'
+  });
 
   try {
     // Check for cancellation at the start
@@ -32,7 +38,13 @@ export const runCategorizationWorkflow = async (
 
     // Get ALL contacts that haven't been categorized yet (no limit)
     console.log('Fetching uncategorized contacts...');
-    const allContacts = await fetchUncategorizedContacts(contactIds);
+    let allContacts = await fetchUncategorizedContacts(contactIds);
+
+    // Apply contact limit if specified
+    if (contactLimit && contactLimit > 0) {
+      allContacts = allContacts.slice(0, contactLimit);
+      console.log(`Limited to ${contactLimit} contacts. Processing ${allContacts.length} contacts.`);
+    }
 
     if (allContacts.length === 0) {
       console.log('No uncategorized contacts to process');

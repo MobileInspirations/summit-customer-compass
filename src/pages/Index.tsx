@@ -147,7 +147,7 @@ const Index = () => {
     }
   };
 
-  const handleAICategorizeAll = async (apiKey: string) => {
+  const handleAICategorizeAll = async (apiKey: string, contactLimit?: number) => {
     setIsCategorizing(true);
     setCategorizationProgress({
       progress: 0,
@@ -163,7 +163,7 @@ const Index = () => {
     try {
       await categorizeContacts(undefined, (progress) => {
         setCategorizationProgress(progress);
-      }, true, apiKey, cancellationTokenRef.current);
+      }, true, apiKey, cancellationTokenRef.current, contactLimit);
       queryClient.invalidateQueries({ queryKey: ["categories"] });
       toast({
         title: "AI Categorization complete",

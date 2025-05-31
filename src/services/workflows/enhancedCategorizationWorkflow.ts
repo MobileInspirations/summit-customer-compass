@@ -1,3 +1,4 @@
+
 import { categorizeContactEnhanced } from "../categorization/enhancedContactProcessor";
 import { fetchCategories } from "../data/contactDataService";
 import { fetchUncategorizedContacts } from "../data/uncategorizedContactsService";
@@ -13,10 +14,16 @@ export const runEnhancedCategorizationWorkflow = async (
   useAI: boolean = false,
   openaiApiKey?: string,
   onProgress?: (progress: CategorizationProgress) => void,
-  cancellationToken?: CancellationToken
+  cancellationToken?: CancellationToken,
+  contactLimit?: number
 ): Promise<void> => {
   console.log('=== Starting enhanced contact categorization workflow ===');
-  console.log('Parameters:', { contactIds: contactIds?.length || 'all', useAI, hasApiKey: !!openaiApiKey });
+  console.log('Parameters:', { 
+    contactIds: contactIds?.length || 'all', 
+    useAI, 
+    hasApiKey: !!openaiApiKey,
+    contactLimit: contactLimit || 'unlimited'
+  });
 
   try {
     // Check for cancellation at the start
@@ -53,7 +60,13 @@ export const runEnhancedCategorizationWorkflow = async (
 
     // Get contacts that haven't been categorized yet
     console.log('Fetching uncategorized contacts...');
-    const allContacts = await fetchUncategorizedContacts(contactIds);
+    let allContacts = await fetchUncategorizedContacts(contactIds);
+
+    // Apply contact limit if specified
+    if (contactLimit && contactLimit > 0) {
+      allContacts = allContacts.slice(0, contactLimit);
+      console.log(`Limited to ${contactLimit} contacts. Processing ${allContacts.length} contacts.`);
+    }
 
     if (allContacts.length === 0) {
       console.log('No uncategorized contacts to process');
