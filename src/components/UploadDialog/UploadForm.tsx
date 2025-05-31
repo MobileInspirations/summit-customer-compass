@@ -22,16 +22,31 @@ const parseCSV = (csvContent: string) => {
     throw new Error("CSV must contain an 'Email' column");
   }
 
+  const nameIndex = headers.findIndex(h => h.includes('name') || h.includes('first'));
+  const companyIndex = headers.findIndex(h => h.includes('company') || h.includes('organization'));
+  const summitHistoryIndex = headers.findIndex(h => h.includes('summit') || h.includes('tag') || h.includes('history'));
+
   const contacts = [];
   for (let i = 1; i < lines.length; i++) {
     const values = lines[i].split(',').map(v => v.trim());
     const email = values[emailIndex];
     
     if (email && email.includes('@')) {
+      // Extract summit history from CSV if available
+      let summitHistory: string[] = [];
+      if (summitHistoryIndex !== -1 && values[summitHistoryIndex]) {
+        // Split by semicolon or comma to support multiple summits
+        summitHistory = values[summitHistoryIndex]
+          .split(/[;,]/)
+          .map(s => s.trim())
+          .filter(s => s.length > 0);
+      }
+
       contacts.push({
         email,
-        full_name: values[headers.findIndex(h => h.includes('name'))] || '',
-        company: values[headers.findIndex(h => h.includes('company'))] || ''
+        name: nameIndex !== -1 ? values[nameIndex] : '',
+        company: companyIndex !== -1 ? values[companyIndex] : '',
+        summit_history: summitHistory.length > 0 ? summitHistory.join(';') : undefined
       });
     }
   }

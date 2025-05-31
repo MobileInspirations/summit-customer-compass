@@ -38,11 +38,15 @@ export const mapFolderToBucket = (pathParts: string[], filename: string): Bucket
     // Handle other bucket structures with flexible mapping
     bucket = mapFolderNameToBucket(mainFolder);
 
-    // Extract summit name - if there's a second level folder, use it, otherwise use the filename without engagement prefix
+    // Extract summit name from folder structure - use the deepest folder name as summit
     if (pathParts.length >= 2) {
-      summitName = pathParts[1];
+      // Use the last folder in the path as the summit name
+      summitName = pathParts[pathParts.length - 1];
+      console.log(`Summit name from deepest folder: ${summitName}`);
     } else {
-      summitName = extractSummitFromFilename(filename);
+      // If only one folder level, use it as summit name
+      summitName = mainFolder;
+      console.log(`Summit name from main folder: ${summitName}`);
     }
   }
 
@@ -73,7 +77,7 @@ const mapFolderNameToBucket = (folderName: string): MainBucketId => {
 };
 
 const extractSummitFromFilename = (filename: string): string => {
-  // Extract summit name from filename by removing engagement prefix
+  // Extract summit name from filename by removing engagement prefix and extension
   const filenameWithoutExt = filename.replace(/\.(csv|CSV)$/, '');
   return filenameWithoutExt.replace(/^[HLMU]-/i, '').trim();
 };
