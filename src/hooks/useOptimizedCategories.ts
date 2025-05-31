@@ -7,7 +7,7 @@ export type OptimizedCategory = Tables<"customer_categories"> & {
   count: number;
 };
 
-const BATCH_SIZE = 2000; // Increased batch size for efficiency
+const BATCH_SIZE = 1000; // Optimal batch size for large datasets
 
 export const useOptimizedCategories = () => {
   return useQuery({
@@ -27,10 +27,25 @@ export const useOptimizedCategories = () => {
       }
 
       if (!categories || categories.length === 0) {
+        console.log('No categories found');
         return [];
       }
 
-      // Get all contact-category relationships in batches
+      console.log(`Found ${categories.length} categories`);
+
+      // Get total relationship count for verification
+      const { count: totalRelationships, error: countError } = await supabase
+        .from("contact_categories")
+        .select("*", { count: 'exact', head: true });
+
+      if (countError) {
+        console.error("Error getting relationship count:", countError);
+        throw countError;
+      }
+
+      console.log(`Total contact-category relationships: ${totalRelationships}`);
+
+      // Get all contact-category relationships efficiently
       let allRelationships: { category_id: string; contact_id: string }[] = [];
       let from = 0;
 
@@ -42,7 +57,7 @@ export const useOptimizedCategories = () => {
 
         if (fetchError) {
           console.error("Error fetching contact relationships:", fetchError);
-          break;
+          throw fetchError;
         }
 
         if (!batch || batch.length === 0) {
@@ -59,7 +74,9 @@ export const useOptimizedCategories = () => {
         from += BATCH_SIZE;
       }
 
-      // Count relationships by category_id
+      console.log(`Total relationships fetched: ${allRelationships.length}`);
+
+      // Count relationships by category_id using Map for efficiency
       const categoryCountMap = new Map<string, number>();
       
       allRelationships.forEach(rel => {
@@ -68,12 +85,20 @@ export const useOptimizedCategories = () => {
       });
 
       // Combine categories with their counts
-      const categoriesWithCounts = categories.map(category => ({
-        ...category,
-        count: categoryCountMap.get(category.id) || 0
-      }));
+      const categoriesWithCounts = categories.map(category => {
+        const count = categoryCountMap.get(category.id) || 0;
+        console.log(`Category ${category.name}: ${count} contacts`);
+        
+        return {
+          ...category,
+          count: count
+        };
+      });
 
+      const totalCounted = categoriesWithCounts.reduce((sum, cat) => sum + cat.count, 0);
+      console.log(`Total contacts counted across categories: ${totalCounted}`);
       console.log(`Processed ${categories.length} categories with relationship counts`);
+      
       return categoriesWithCounts;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -85,6 +110,8 @@ export const useOptimizedCategoriesByType = (type: "customer" | "personality") =
   const { data: categories, isLoading, error } = useOptimizedCategories();
   
   const filteredCategories = categories?.filter(cat => cat.category_type === type) || [];
+  
+  console.log(`Filtered ${type} categories:`, filteredCategories.length);
   
   return {
     data: filteredCategories,
