@@ -20,9 +20,9 @@ export const useOptimizedBucketCounts = () => {
 
       console.log('Total contacts in database:', totalCount);
 
-      // Use database aggregation with proper SQL
+      // Use database aggregation with proper SQL - properly typed RPC call
       const { data: bucketStats, error } = await supabase
-        .rpc('get_bucket_counts');
+        .rpc('get_bucket_counts') as { data: Array<{ bucket: string; count: number }> | null; error: any };
 
       if (error) {
         console.warn("RPC function not available, falling back to manual counting:", error);
@@ -66,8 +66,8 @@ export const useOptimizedBucketCounts = () => {
         const bucketCounts: Record<string, number> = {};
         
         // Initialize known buckets
-        const knownBuckets = ['biz-op', 'health', 'survivalist', 'cannot-place'];
-        knownBuckets.forEach(bucket => {
+        const knownBuckets: readonly string[] = ['biz-op', 'health', 'survivalist', 'cannot-place'] as const;
+        knownBuckets.forEach((bucket: string) => {
           bucketCounts[bucket] = 0;
         });
 
@@ -105,16 +105,14 @@ export const useOptimizedBucketCounts = () => {
       const bucketCounts: Record<string, number> = {};
       
       // Initialize known buckets
-      const knownBuckets = ['biz-op', 'health', 'survivalist', 'cannot-place'];
-      knownBuckets.forEach(bucket => {
+      const knownBuckets: readonly string[] = ['biz-op', 'health', 'survivalist', 'cannot-place'] as const;
+      knownBuckets.forEach((bucket: string) => {
         bucketCounts[bucket] = 0;
       });
 
       // Type the bucketStats properly
-      const stats = bucketStats as Array<{ bucket: string; count: number }> | null;
-      
-      if (stats && Array.isArray(stats)) {
-        stats.forEach((stat) => {
+      if (bucketStats && Array.isArray(bucketStats)) {
+        bucketStats.forEach((stat) => {
           if (stat && stat.bucket && typeof stat.count === 'number') {
             bucketCounts[stat.bucket] = stat.count;
           }
