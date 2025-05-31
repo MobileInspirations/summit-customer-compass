@@ -62,13 +62,14 @@ export const useOptimizedBucketCounts = () => {
           from += batchSize;
         }
 
-        // Count buckets manually
-        const bucketCounts: Record<string, number> = {
-          'biz-op': 0,
-          'health': 0,
-          'survivalist': 0,
-          'cannot-place': 0
-        };
+        // Count buckets manually with proper typing
+        const bucketCounts: Record<string, number> = {};
+        
+        // Initialize known buckets
+        const knownBuckets = ['biz-op', 'health', 'survivalist', 'cannot-place'];
+        knownBuckets.forEach(bucket => {
+          bucketCounts[bucket] = 0;
+        });
 
         allBuckets.forEach(bucket => {
           if (!bucket) return;
@@ -101,12 +102,13 @@ export const useOptimizedBucketCounts = () => {
       }
 
       // If RPC function exists, use its result
-      const bucketCounts: Record<string, number> = {
-        'biz-op': 0,
-        'health': 0,
-        'survivalist': 0,
-        'cannot-place': 0
-      };
+      const bucketCounts: Record<string, number> = {};
+      
+      // Initialize known buckets
+      const knownBuckets = ['biz-op', 'health', 'survivalist', 'cannot-place'];
+      knownBuckets.forEach(bucket => {
+        bucketCounts[bucket] = 0;
+      });
 
       // Type the bucketStats properly
       const stats = bucketStats as Array<{ bucket: string; count: number }> | null;
