@@ -62,20 +62,36 @@ const ContactsTable = () => {
   };
 
   const getMainBucketLabel = (bucket?: string) => {
+    console.log('Raw bucket value:', bucket); // Debug log
     switch (bucket) {
-      case 'biz-op': return 'Business Operations';
-      case 'health': return 'Health';
-      case 'survivalist': return 'Survivalist';
-      default: return 'Unknown';
+      case 'biz-op':
+      case 'Business Operations':
+        return 'Business Operations';
+      case 'health':
+      case 'Health':
+        return 'Health';
+      case 'survivalist':
+      case 'Survivalist':
+        return 'Survivalist';
+      default:
+        console.warn('Unknown bucket value:', bucket); // Debug log
+        return bucket || 'Unknown';
     }
   };
 
   const getMainBucketVariant = (bucket?: string) => {
     switch (bucket) {
-      case 'biz-op': return 'default';
-      case 'health': return 'secondary';
-      case 'survivalist': return 'outline';
-      default: return 'outline';
+      case 'biz-op':
+      case 'Business Operations':
+        return 'default';
+      case 'health':
+      case 'Health':
+        return 'secondary';
+      case 'survivalist':
+      case 'Survivalist':
+        return 'outline';
+      default:
+        return 'outline';
     }
   };
 
