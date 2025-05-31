@@ -1,9 +1,8 @@
-
 import { categorizeContactEnhanced } from "../categorization/enhancedContactProcessor";
 import { fetchCategories } from "../data/contactDataService";
 import { fetchUncategorizedContacts } from "../data/uncategorizedContactsService";
 import { ensureMainBucketsExist } from "../bucketCategorizationService";
-import { ensurePersonalityBucketsExist, initializeOpenAI } from "../ai/openaiCategorizationService";
+import { ensurePersonalityBucketsExist } from "../ai/openaiCategorizationService";
 import { createProgressUpdate, createInitialProgress } from "../utils/progressTracker";
 import type { ContactForCategorization } from "../types/contactTypes";
 import type { CategorizationProgress } from "../utils/progressTracker";
@@ -29,13 +28,9 @@ export const runEnhancedCategorizationWorkflow = async (
     // Check for cancellation at the start
     cancellationToken?.throwIfCancelled();
 
-    // Initialize OpenAI if using AI categorization
-    if (useAI && openaiApiKey) {
-      console.log('Initializing OpenAI for AI categorization...');
-      initializeOpenAI(openaiApiKey);
-      console.log('OpenAI client initialized for AI categorization');
-    } else if (useAI && !openaiApiKey) {
-      throw new Error('AI categorization requested but no API key provided');
+    // Note: OpenAI initialization is now handled internally by the service when needed
+    if (useAI && !openaiApiKey) {
+      console.log('AI categorization will use API key from Supabase secrets');
     }
 
     // Ensure main buckets exist (including "Cannot Place")
