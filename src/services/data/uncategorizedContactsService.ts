@@ -1,81 +1,45 @@
 
 import { supabase } from "@/integrations/supabase/client";
+import type { ContactForCategorization } from "../types/contactTypes";
 
-export const fetchUncategorizedContacts = async (contactLimit?: number) => {
-  console.log(`Fetching uncategorized contacts with limit: ${contactLimit}`);
+export const fetchUncategorizedContacts = async (contactLimit?: number): Promise<ContactForCategorization[]> => {
+  console.log(`Fetching uncategorized contacts with limit: ${contactLimit || 'no limit'}`);
   
-  // If we have a specific limit under 1000, use it in the query for efficiency
-  if (contactLimit && contactLimit < 1000) {
-    console.log(`Using SQL limit for efficient query: ${contactLimit}`);
-    
-    const { data: contacts, error } = await supabase
-      .from('contacts')
-      .select(`
-        id, 
-        email, 
-        full_name, 
-        company, 
-        tags, 
-        summit_history
-      `)
-      .limit(contactLimit);
+  let query = supabase
+    .from('contacts')
+    .select(`
+      id,
+      email,
+      full_name,
+      company,
+      tags,
+      summit_history,
+      engagement_level
+    `)
+    .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Error fetching limited contacts:', error);
-      throw error;
-    }
-
-    console.log(`Successfully fetched ${contacts?.length || 0} contacts with SQL limit`);
-    return contacts || [];
+  // Apply the contact limit if specified
+  if (contactLimit && contactLimit > 0) {
+    query = query.limit(contactLimit);
+    console.log(`Applied limit of ${contactLimit} contacts`);
   }
 
-  // For larger limits or unlimited, fetch all and then slice if needed
-  console.log('Fetching all contacts and applying limit in memory');
-  
-  let allContacts: any[] = [];
-  let from = 0;
-  const batchSize = 1000;
-  
-  while (true) {
-    const { data: contacts, error } = await supabase
-      .from('contacts')
-      .select(`
-        id, 
-        email, 
-        full_name, 
-        company, 
-        tags, 
-        summit_history
-      `)
-      .range(from, from + batchSize - 1);
+  const { data: contacts, error } = await query;
 
-    if (error) {
-      console.error('Error fetching contacts batch:', error);
-      throw error;
-    }
-
-    if (!contacts || contacts.length === 0) {
-      break;
-    }
-
-    allContacts = allContacts.concat(contacts);
-    console.log(`Fetched batch: ${contacts.length} contacts (total so far: ${allContacts.length})`);
-
-    // If we have a limit and we've reached it, break early
-    if (contactLimit && allContacts.length >= contactLimit) {
-      allContacts = allContacts.slice(0, contactLimit);
-      console.log(`Reached contact limit, returning ${allContacts.length} contacts`);
-      break;
-    }
-
-    // If we got less than the batch size, we've reached the end
-    if (contacts.length < batchSize) {
-      break;
-    }
-
-    from += batchSize;
+  if (error) {
+    console.error('Error fetching uncategorized contacts:', error);
+    throw error;
   }
 
-  console.log(`Final result: ${allContacts.length} contacts`);
-  return allContacts;
+  console.log(`Successfully fetched ${contacts?.length || 0} contacts for categorization`);
+  
+  return contacts?.map(contact => ({
+    id: contact.id,
+    email: contact.email,
+    full_name: contact.full_name,
+    company: contact.company,
+    tags: contact.tags || [],
+    summit_history: contact.summit_history || [],
+    engagement_level: contact.engagement_level
+  })) || [];
 };

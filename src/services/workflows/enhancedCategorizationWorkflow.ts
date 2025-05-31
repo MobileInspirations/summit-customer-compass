@@ -13,18 +13,25 @@ export const runEnhancedCategorizationWorkflow = async (
   cancellationToken?: CancellationToken,
   contactLimit?: number
 ): Promise<number> => {
-  console.log('Starting enhanced categorization workflow with AI:', useAI);
+  console.log(`Starting enhanced categorization workflow with AI: ${useAI}, contact limit: ${contactLimit || 'no limit'}`);
   
   const progressTracker = new ProgressTracker(onProgress);
   
   try {
     // Fetch contacts and categories
-    const [contacts, categories] = await Promise.all([
-      contactIds ? 
-        fetchUncategorizedContacts().then(all => all.filter(c => contactIds.includes(c.id))) :
-        fetchUncategorizedContacts(contactLimit),
-      fetchCategories()
-    ]);
+    let contacts;
+    if (contactIds) {
+      // If specific contact IDs are provided, fetch all uncategorized and filter
+      const allContacts = await fetchUncategorizedContacts();
+      contacts = allContacts.filter(c => contactIds.includes(c.id));
+      console.log(`Filtered to ${contacts.length} specific contacts from ${allContacts.length} total`);
+    } else {
+      // Apply the contact limit directly when fetching
+      contacts = await fetchUncategorizedContacts(contactLimit);
+      console.log(`Fetched ${contacts.length} contacts with limit: ${contactLimit || 'no limit'}`);
+    }
+
+    const categories = await fetchCategories();
 
     if (!contacts.length) {
       console.log('No contacts to categorize');
@@ -32,7 +39,7 @@ export const runEnhancedCategorizationWorkflow = async (
     }
 
     const totalContacts = contacts.length;
-    console.log(`Found ${totalContacts} contacts to categorize with AI: ${useAI}`);
+    console.log(`Processing ${totalContacts} contacts with AI: ${useAI}`);
     
     progressTracker.initialize(totalContacts);
 
