@@ -2,6 +2,7 @@
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { CheckCircle, Loader2, X } from "lucide-react";
+import { useEffect, useState } from "react";
 
 interface CategorizationProgressProps {
   isVisible: boolean;
@@ -22,12 +23,30 @@ export const CategorizationProgress = ({
   totalCount,
   onStop
 }: CategorizationProgressProps) => {
+  const [startTime, setStartTime] = useState<number | null>(null);
+  const [contactsPerSecond, setContactsPerSecond] = useState<number>(0);
+
+  useEffect(() => {
+    if (isVisible && !startTime && processedCount > 0) {
+      setStartTime(Date.now());
+    }
+  }, [isVisible, processedCount, startTime]);
+
+  useEffect(() => {
+    if (startTime && processedCount > 0) {
+      const elapsedSeconds = (Date.now() - startTime) / 1000;
+      const rate = processedCount / elapsedSeconds;
+      setContactsPerSecond(Math.round(rate));
+    }
+  }, [processedCount, startTime]);
+
   if (!isVisible) return null;
 
   const displayProgress = Math.max(0, Math.min(100, progress));
   const displayCurrentBatch = Math.max(1, currentBatch);
   const displayTotalBatches = Math.max(1, totalBatches);
   const isComplete = displayProgress === 100;
+  const isFastEnough = contactsPerSecond >= 50;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -50,11 +69,28 @@ export const CategorizationProgress = ({
             <Progress value={displayProgress} className="w-full" />
           </div>
 
-          <div className="space-y-1 text-sm text-gray-600">
+          <div className="space-y-2 text-sm">
             {totalCount > 0 ? (
               <>
-                <div>Batch {displayCurrentBatch} of {displayTotalBatches}</div>
-                <div>Processed {processedCount.toLocaleString()} of {totalCount.toLocaleString()} contacts</div>
+                <div className="text-gray-600">Batch {displayCurrentBatch} of {displayTotalBatches}</div>
+                <div className="font-semibold text-lg text-blue-600">
+                  {processedCount.toLocaleString()} / {totalCount.toLocaleString()} contacts
+                </div>
+                {processedCount > 0 && (
+                  <div className={`font-medium ${isFastEnough ? 'text-green-600' : 'text-orange-600'}`}>
+                    {contactsPerSecond} contacts/second
+                    {contactsPerSecond < 50 && (
+                      <span className="text-red-500 block text-xs">
+                        (Below 50/sec minimum)
+                      </span>
+                    )}
+                    {contactsPerSecond >= 50 && (
+                      <span className="text-green-500 block text-xs">
+                        ✓ Meeting speed requirements
+                      </span>
+                    )}
+                  </div>
+                )}
               </>
             ) : (
               <div>Initializing categorization...</div>
@@ -62,9 +98,16 @@ export const CategorizationProgress = ({
           </div>
 
           {isComplete ? (
-            <div className="flex items-center justify-center space-x-2 text-green-600">
-              <CheckCircle className="w-5 h-5" />
-              <span className="font-medium">Categorization Complete!</span>
+            <div className="space-y-2">
+              <div className="flex items-center justify-center space-x-2 text-green-600">
+                <CheckCircle className="w-5 h-5" />
+                <span className="font-medium">Categorization Complete!</span>
+              </div>
+              {processedCount > 0 && (
+                <div className="text-sm text-gray-600">
+                  Final rate: {contactsPerSecond} contacts/second
+                </div>
+              )}
             </div>
           ) : (
             onStop && (
