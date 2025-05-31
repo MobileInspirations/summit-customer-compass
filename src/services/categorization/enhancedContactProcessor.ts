@@ -81,7 +81,7 @@ export const categorizeContactEnhanced = async (
     if (useAI) {
       console.log('Starting AI personality categorization...');
       try {
-        // Extract tags from summit history for AI processing
+        // Extract tags from contact, fallback to empty array if not present
         const contactTags = contact.tags || [];
         const summitHistory = contact.summit_history || [];
         
