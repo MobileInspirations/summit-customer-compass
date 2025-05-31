@@ -1,19 +1,19 @@
+
 import { useState, useEffect } from "react";
-import { useSession, signOut } from "next-auth/react";
-import { useRouter } from "next/router";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { fetchContactsCount } from "@/services/data/contactDataService";
-import { fetchAllCategories } from "@/services/data/categoryDataService";
-import { MainBucketId } from "@/services/types/contactTypes";
+import { fetchAllCategories } from "@/services/data/contactDataService";
+import { useAuth } from "@/hooks/useAuth";
 
 import { EnhancedDashboardHeader } from "@/components/Dashboard/EnhancedDashboardHeader";
-import { ContactsTable } from "@/components/Dashboard/ContactsTable";
-import { UploadDialog } from "@/components/Dashboard/UploadDialog";
-import { ExportDialog } from "@/components/Dashboard/ExportDialog";
-import { AICategorizationDialog } from "@/components/Dashboard/AICategorizationDialog";
+import ContactsTable from "@/components/ContactsTable";
+import { UploadDialog } from "@/components/UploadDialog";
+import { ExportDialog } from "@/components/ExportDialog";
+import { AICategorizationDialog } from "@/components/AICategorizationDialog";
 import { ContactLimitDialog } from "@/components/ContactLimitDialog";
-import { CategorizationResultsDialog } from "@/components/Dashboard/CategorizationResultsDialog";
+import { CategorizationResultsDialog } from "@/components/CategorizationResultsDialog";
 import { useDialogState } from "@/hooks/useDialogState";
 import { useExportState } from "@/hooks/useExportState";
 import { useCategorizationState } from "@/hooks/useCategorizationState";
@@ -25,12 +25,12 @@ import { ErrorLogViewer } from "@/components/ErrorLogViewer";
 
 const Index = () => {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [selectedBucket, setSelectedBucket] = useState<MainBucketId>('biz-op');
+  const [selectedBucket, setSelectedBucket] = useState<string>('biz-op');
   const [isSorting, setIsSorting] = useState(false);
   const [showErrorLogs, setShowErrorLogs] = useState(false);
   
-  const { data: session } = useSession();
-  const router = useRouter();
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const dialogState = useDialogState();
   const exportState = useExportState();
@@ -63,18 +63,18 @@ const Index = () => {
   });
 
   useEffect(() => {
-    if (!session) {
-      router.push("/login");
+    if (!user) {
+      navigate("/auth");
     }
-  }, [session, router]);
+  }, [user, navigate]);
 
-  if (!session) {
+  if (!user) {
     return null;
   }
 
   const handleSignOut = async () => {
-    await signOut({ redirect: false });
-    router.push("/login");
+    await signOut();
+    navigate("/auth");
   };
 
   const handleViewAllContacts = () => {
@@ -119,20 +119,9 @@ const Index = () => {
         </Button>
       </div>
 
-      <ContactsTable
-        selectedCategories={selectedCategories}
-        setSelectedCategories={setSelectedCategories}
-        selectedBucket={selectedBucket}
-        setSelectedBucket={setSelectedBucket}
-        isSorting={isSorting}
-        setIsSorting={setIsSorting}
-        isExporting={exportState.isExporting}
-        isCategorizing={categorizationState.isCategorizing}
-        onStopCategorization={categorizationHandlers.handleStopCategorization}
-        categorizationProgress={categorizationState.categorizationProgress}
-        contactsCount={contactsCount}
-        allCategories={allCategories}
-      />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <ContactsTable />
+      </div>
 
       {/* Dialogs */}
       <UploadDialog 
@@ -143,7 +132,7 @@ const Index = () => {
         open={dialogState.showExportDialog} 
         onOpenChange={dialogState.setShowExportDialog}
         selectedCategories={selectedCategories.map(id => 
-          allCategories.find(cat => cat.id === id)!
+          allCategories.find((cat: any) => cat.id === id)
         ).filter(Boolean)}
         onEmailCleaningProgress={exportState.handleEmailCleaningProgress}
       />
