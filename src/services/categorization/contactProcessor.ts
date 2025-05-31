@@ -16,14 +16,20 @@ export const categorizeContact = async (
 
   try {
     // Use the mandatory bucket categorization system
+    // Combine tags and summit_history for better categorization
+    const allTags = [
+      ...(contact.tags || []),
+      ...(contact.summit_history || [])
+    ];
+
     const contactForRules: ContactForRuleCategorization = {
       id: contact.id,
-      tags: contact.tags || contact.summit_history || []
+      tags: allTags.length > 0 ? allTags : null
     };
 
     console.log(`Prepared contact for rules:`, contactForRules);
-    console.log(`Tags array length:`, contactForRules.tags?.length);
-    console.log(`Individual tags:`, contactForRules.tags);
+    console.log(`Combined tags array length:`, contactForRules.tags?.length);
+    console.log(`Combined tags:`, contactForRules.tags);
 
     const mandatoryResult = categorizeContactMandatoryBuckets(contactForRules);
     console.log(`Mandatory categorization for ${contact.email}: Main=${mandatoryResult.mainBucket}, Personality=${mandatoryResult.personalityBucket}`);
@@ -62,13 +68,13 @@ export const categorizeContact = async (
       console.log(`Assigned to personality bucket: ${personalityBucketCategory.name}`);
     } else {
       console.warn(`Personality bucket category not found: ${mandatoryResult.personalityBucket}`);
-      // Try to find a default personality category
+      // Try to find a default personality category - use the first one available
       const defaultPersonalityCategory = categories.find(cat => 
-        cat.name === 'Entrepreneurship & Business Development' && cat.category_type === 'personality'
+        cat.category_type === 'personality'
       );
       if (defaultPersonalityCategory) {
         assignedCategories.push(defaultPersonalityCategory.id);
-        console.log(`Assigned to default personality category`);
+        console.log(`Assigned to first available personality category: ${defaultPersonalityCategory.name}`);
       }
     }
 
