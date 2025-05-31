@@ -1,78 +1,52 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { MAIN_BUCKETS } from "@/services/bucketCategorizationService";
 
 export const useBucketCounts = () => {
   return useQuery({
     queryKey: ["bucket-counts"],
     queryFn: async () => {
-      const bucketCounts: Record<string, number> = {};
+      console.log('=== Starting bucket counts calculation ===');
+      
+      // Get all contacts with their main_bucket values
+      const { data: allContacts, error } = await supabase
+        .from("contacts")
+        .select("main_bucket");
 
-      // Get counts for each main bucket using unique contacts
-      for (const bucket of Object.values(MAIN_BUCKETS)) {
-        try {
-          // First, try to find the category by exact name match
-          let { data: category, error: categoryError } = await supabase
-            .from('customer_categories')
-            .select('id')
-            .eq('name', bucket.name)
-            .maybeSingle();
-
-          // If not found by name, try finding by bucket ID pattern
-          if (!category) {
-            const { data: categoryById, error: categoryByIdError } = await supabase
-              .from('customer_categories')
-              .select('id')
-              .ilike('name', `%${bucket.id}%`)
-              .maybeSingle();
-            
-            if (categoryById) {
-              category = categoryById;
-            }
-          }
-
-          if (!category) {
-            console.log(`No category found for bucket: ${bucket.name} (${bucket.id})`);
-            bucketCounts[bucket.id] = 0;
-            continue;
-          }
-
-          // Get count of all contact_category records for this category
-          const { count: totalRecords, error: countError } = await supabase
-            .from('contact_categories')
-            .select('contact_id', { count: 'exact', head: true })
-            .eq('category_id', category.id);
-
-          if (countError) {
-            console.error('Error counting contacts for bucket:', bucket.id, countError);
-            bucketCounts[bucket.id] = 0;
-            continue;
-          }
-
-          // Get all contact_category records for this category to count unique contacts
-          const { data: contactCategories, error: dataError } = await supabase
-            .from('contact_categories')
-            .select('contact_id')
-            .eq('category_id', category.id)
-            .not('contact_id', 'is', null);
-
-          if (dataError) {
-            console.error('Error fetching contact data for bucket:', bucket.id, dataError);
-            bucketCounts[bucket.id] = 0;
-          } else {
-            // Count unique contact IDs
-            const uniqueContactIds = new Set(contactCategories?.map(cc => cc.contact_id) || []);
-            bucketCounts[bucket.id] = uniqueContactIds.size;
-            console.log(`Bucket ${bucket.id}: ${totalRecords || 0} total records, ${uniqueContactIds.size} unique contacts`);
-          }
-        } catch (error) {
-          console.error(`Error processing bucket ${bucket.id}:`, error);
-          bucketCounts[bucket.id] = 0;
-        }
+      if (error) {
+        console.error("Error fetching contacts for bucket counts:", error);
+        throw error;
       }
 
-      console.log('Final unique bucket counts calculated:', bucketCounts);
+      console.log('Total contacts fetched for bucket counting:', allContacts?.length);
+      console.log('Sample contact main_bucket values:', allContacts?.slice(0, 10).map(c => c.main_bucket));
+
+      // Count contacts by main_bucket
+      const bucketCounts: Record<string, number> = {
+        'biz-op': 0,
+        'health': 0,
+        'survivalist': 0,
+        'cannot-place': 0
+      };
+
+      allContacts?.forEach(contact => {
+        const bucket = contact.main_bucket;
+        console.log('Processing contact with bucket:', bucket);
+        
+        if (bucket === 'biz-op' || bucket === 'Business Operations') {
+          bucketCounts['biz-op']++;
+        } else if (bucket === 'health' || bucket === 'Health') {
+          bucketCounts['health']++;
+        } else if (bucket === 'survivalist' || bucket === 'Survivalist') {
+          bucketCounts['survivalist']++;
+        } else if (bucket === 'cannot-place' || bucket === 'Cannot Place') {
+          bucketCounts['cannot-place']++;
+        } else {
+          console.warn('Unknown bucket value found:', bucket);
+        }
+      });
+
+      console.log('Final bucket counts calculated:', bucketCounts);
       return bucketCounts;
     },
   });

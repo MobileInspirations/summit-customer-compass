@@ -6,6 +6,7 @@ export const useContacts = () => {
   return useQuery({
     queryKey: ["contacts"],
     queryFn: async () => {
+      console.log('=== Fetching all contacts ===');
       const { data, error } = await supabase
         .from("contacts")
         .select("*")
@@ -15,6 +16,12 @@ export const useContacts = () => {
         console.error("Error fetching contacts:", error);
         throw error;
       }
+
+      console.log('Total contacts fetched:', data?.length);
+      console.log('Sample contacts main_bucket values:', data?.slice(0, 5).map(c => ({
+        email: c.email,
+        main_bucket: c.main_bucket
+      })));
 
       return data;
     },
@@ -34,6 +41,7 @@ export const useContactsCount = () => {
         throw error;
       }
 
+      console.log('Total contact count:', count);
       return count || 0;
     },
   });
