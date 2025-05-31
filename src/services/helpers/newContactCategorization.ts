@@ -49,7 +49,7 @@ export const categorizeNewContacts = async (contactEmails: string[]): Promise<vo
     console.log('Starting fast categorization for newly uploaded contacts...');
     try {
       await Promise.race([
-        runCategorizationWorkflow(allContactIds, undefined, undefined, undefined, true),
+        runCategorizationWorkflow(allContactIds, undefined, undefined, undefined),
         new Promise((_, reject) => 
           setTimeout(() => reject(new Error('Categorization timeout')), 300000) // 5 minute timeout
         )
