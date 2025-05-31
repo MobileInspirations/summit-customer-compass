@@ -8,10 +8,12 @@ import { fetchAllCategories } from "@/services/data/categoryDataService";
 import { useAuth } from "@/hooks/useAuth";
 import { useCategoriesByType } from "@/hooks/useCategories";
 import { useBucketCounts } from "@/hooks/useBucketCounts";
+import { useTotalUniqueContacts } from "@/hooks/useTotalUniqueContacts";
 
 import { EnhancedDashboardHeader } from "./EnhancedDashboardHeader";
 import { BucketSelector } from "../BucketSelector";
 import { CategoriesSection } from "./CategoriesSection";
+import { StatsCards } from "./StatsCards";
 import { useDialogState } from "@/hooks/useDialogState";
 import { useExportState } from "@/hooks/useExportState";
 import { useCategorizationState } from "@/hooks/useCategorizationState";
@@ -35,6 +37,8 @@ export const Dashboard = () => {
     queryKey: ["contacts-count"],
     queryFn: fetchContactsCount,
   });
+
+  const { data: totalUniqueContacts = 0 } = useTotalUniqueContacts();
 
   const { data: allCategories = [] } = useQuery({
     queryKey: ["categories"],
@@ -122,6 +126,13 @@ export const Dashboard = () => {
       <ErrorLogButton />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px:8 py-8">
+        <StatsCards
+          totalContacts={contactsCount || 0}
+          totalUniqueContacts={totalUniqueContacts}
+          categoriesCount={allCategories.length}
+          selectedCount={selectedCategories.length}
+        />
+
         <BucketSelector 
           selectedBucket={selectedBucket}
           onBucketChange={handleBucketChange}

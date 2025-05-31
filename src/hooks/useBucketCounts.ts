@@ -9,7 +9,7 @@ export const useBucketCounts = () => {
     queryFn: async () => {
       const bucketCounts: Record<string, number> = {};
 
-      // Get counts for each main bucket using the bucket ID to find the category
+      // Get counts for each main bucket using unique contacts
       for (const bucket of Object.values(MAIN_BUCKETS)) {
         // Use the bucket ID directly to find the category (this matches how assignContactsToBucket works)
         const { data: category, error: categoryError } = await supabase
@@ -34,36 +34,40 @@ export const useBucketCounts = () => {
             continue;
           }
           
-          // Use the category found by ID pattern
-          const { count, error: countError } = await supabase
+          // Count unique contacts in this category
+          const { data: uniqueContacts, error: countError } = await supabase
             .from('contact_categories')
-            .select('*', { count: 'exact', head: true })
+            .select('contact_id', { count: 'exact' })
             .eq('category_id', categoryById.id);
 
           if (countError) {
             console.error('Error counting contacts for bucket:', bucket.id, countError);
             bucketCounts[bucket.id] = 0;
           } else {
-            bucketCounts[bucket.id] = count || 0;
+            // Count unique contact IDs
+            const uniqueContactIds = new Set(uniqueContacts?.map(cc => cc.contact_id) || []);
+            bucketCounts[bucket.id] = uniqueContactIds.size;
           }
           continue;
         }
 
-        // Count contacts in this category
-        const { count, error: countError } = await supabase
+        // Count unique contacts in this category
+        const { data: uniqueContacts, error: countError } = await supabase
           .from('contact_categories')
-          .select('*', { count: 'exact', head: true })
+          .select('contact_id', { count: 'exact' })
           .eq('category_id', category.id);
 
         if (countError) {
           console.error('Error counting contacts for bucket:', bucket.name, countError);
           bucketCounts[bucket.id] = 0;
         } else {
-          bucketCounts[bucket.id] = count || 0;
+          // Count unique contact IDs
+          const uniqueContactIds = new Set(uniqueContacts?.map(cc => cc.contact_id) || []);
+          bucketCounts[bucket.id] = uniqueContactIds.size;
         }
       }
 
-      console.log('Bucket counts calculated:', bucketCounts);
+      console.log('Unique bucket counts calculated:', bucketCounts);
       return bucketCounts;
     },
   });
