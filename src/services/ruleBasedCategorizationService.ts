@@ -17,22 +17,26 @@ export type { ContactForRuleCategorization, MandatoryCategorizationResult };
 export function categorizeContactMandatoryBuckets(
   contact: ContactForRuleCategorization
 ): MandatoryCategorizationResult {
-  // Handle contacts with no tags
+  // Handle contacts with no tags - assign to default bucket instead of "Cannot Place"
   if (!contact.tags || contact.tags.length === 0) {
     return {
       contactId: contact.id,
-      mainBucket: MAIN_BUCKET_NAMES.CANNOT_PLACE,
-      personalityBucket: PERSONALITY_BUCKET_NAMES.CANNOT_PLACE,
+      mainBucket: DEFAULT_MAIN_BUCKET, // Use default instead of "Cannot Place"
+      personalityBucket: DEFAULT_PERSONALITY_BUCKET,
     };
   }
 
   const contactTagsLower = contact.tags.map(tag => tag.toLowerCase());
 
-  // Define the actual lists of bucket names (excluding 'Cannot Place')
-  const mainBucketNameList = Object.values(MAIN_BUCKET_NAMES).filter(name => name !== MAIN_BUCKET_NAMES.CANNOT_PLACE);
+  // Define the actual lists of bucket names (excluding 'Cannot Place' entirely)
+  const mainBucketNameList = [
+    MAIN_BUCKET_NAMES.BUSINESS_OPERATIONS,
+    MAIN_BUCKET_NAMES.HEALTH,
+    MAIN_BUCKET_NAMES.SURVIVALIST
+  ];
   const personalityBucketNameList = Object.values(PERSONALITY_BUCKET_NAMES).filter(name => name !== PERSONALITY_BUCKET_NAMES.CANNOT_PLACE);
   
-  // Determine Main Bucket
+  // Determine Main Bucket - never assign to "Cannot Place"
   const assignedMainBucket = assignToBestBucket(
     contactTagsLower,
     MAIN_BUCKET_KEYWORDS,

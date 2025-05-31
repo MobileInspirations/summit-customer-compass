@@ -50,13 +50,13 @@ export const categorizeContact = async (
       console.log(`Assigned to main bucket: ${mainBucketCategory.name}`);
     } else {
       console.warn(`Main bucket category not found: ${mandatoryResult.mainBucket}`);
-      // Try to find "Cannot Place" as fallback
-      const cannotPlaceCategory = categories.find(cat => 
-        cat.name === 'Cannot Place' && cat.category_type === 'customer'
+      // Find Business Operations as fallback (never "Cannot Place")
+      const businessOpsCategory = categories.find(cat => 
+        cat.name === 'Business Operations' && cat.category_type === 'customer'
       );
-      if (cannotPlaceCategory) {
-        assignedCategories.push(cannotPlaceCategory.id);
-        console.log(`Assigned to Cannot Place fallback`);
+      if (businessOpsCategory) {
+        assignedCategories.push(businessOpsCategory.id);
+        console.log(`Assigned to Business Operations fallback`);
       }
     }
 
