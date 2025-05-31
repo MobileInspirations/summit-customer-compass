@@ -1,7 +1,6 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { assignContactsToBucket, type MainBucketId } from "../bucketCategorizationService";
-import { categorizeNewContacts } from "../contactCategorizationService";
+import { categorizeNewContacts } from "../helpers/newContactCategorization";
 import { type ProcessedContact } from "./csvProcessor";
 import { mergeContactsByEmail } from "./contactMerger";
 
@@ -19,9 +18,9 @@ export const uploadContactsInBatches = async (
     `${bucket}: ${contactsByBucket[bucket as keyof typeof contactsByBucket].length}`
   ));
 
-  // Phase 1: Upload and merge contacts (50-80% of progress)
+  // Phase 1: Upload and merge contacts (50-85% of progress)
   const uploadPhaseStart = 50;
-  const uploadPhaseEnd = 80;
+  const uploadPhaseEnd = 85; // Reduced to give more time for categorization
   const uploadPhaseRange = uploadPhaseEnd - uploadPhaseStart;
 
   for (const bucket of allBuckets) {
@@ -40,8 +39,8 @@ export const uploadContactsInBatches = async (
     const contactsToUpload = Object.values(mergedContacts);
     console.log(`After merging: ${contactsToUpload.length} unique contacts`);
 
-    // Use smaller batches for more frequent progress updates
-    const batchSize = 100; // Reduced from 1000 for more frequent updates
+    // Use larger batches for faster processing
+    const batchSize = 250; // Increased batch size significantly
     const uploadedEmails: string[] = [];
 
     console.log(`Starting batch upload with batch size: ${batchSize}`);
@@ -57,13 +56,13 @@ export const uploadContactsInBatches = async (
         uploadedEmails.push(...batch.map(c => c.email));
         totalProcessed += batch.length;
 
-        // Update progress more frequently
-        const currentProgress = uploadPhaseStart + Math.round((totalProcessed / totalContacts) * uploadPhaseRange);
-        onProgress(currentProgress);
-        console.log(`Progress: ${currentProgress}% (${totalProcessed}/${totalContacts} contacts)`);
+        // Update progress less frequently for better performance
+        if (batchNumber % 2 === 0 || batchNumber === totalBatches) { // Every 2nd batch or last batch
+          const currentProgress = uploadPhaseStart + Math.round((totalProcessed / totalContacts) * uploadPhaseRange);
+          onProgress(currentProgress);
+          console.log(`Progress: ${currentProgress}% (${totalProcessed}/${totalContacts} contacts)`);
+        }
         
-        // Small delay to allow UI updates
-        await new Promise(resolve => setTimeout(resolve, 10));
       } catch (error) {
         console.error(`Error upserting batch ${batchNumber}:`, error);
         // Try individual fallback for this batch
@@ -73,12 +72,6 @@ export const uploadContactsInBatches = async (
             await upsertContactWithProperMerging(contact);
             uploadedEmails.push(contact.email);
             totalProcessed++;
-            
-            // Update progress even during fallback
-            if (totalProcessed % 10 === 0) { // Every 10 contacts
-              const currentProgress = uploadPhaseStart + Math.round((totalProcessed / totalContacts) * uploadPhaseRange);
-              onProgress(currentProgress);
-            }
           } catch (individualError) {
             console.error(`Error upserting contact ${contact.email}:`, individualError);
           }
@@ -98,16 +91,16 @@ export const uploadContactsInBatches = async (
     }
   }
 
-  // Phase 2: Categorization (80-100% of progress)
-  console.log('=== Starting categorization phase ===');
-  onProgress(85);
+  // Phase 2: Fast Categorization (85-100% of progress)
+  console.log('=== Starting fast categorization phase ===');
+  onProgress(90);
   try {
     const allUploadedEmails = Object.values(contactsByBucket)
       .flat()
       .map(contact => contact.email);
-    console.log(`Starting categorization for ${allUploadedEmails.length} contacts`);
+    console.log(`Starting fast categorization for ${allUploadedEmails.length} contacts`);
     await categorizeNewContacts(allUploadedEmails);
-    console.log('Categorization completed successfully');
+    console.log('Fast categorization completed successfully');
     onProgress(100);
   } catch (error) {
     console.error('Error during categorization:', error);

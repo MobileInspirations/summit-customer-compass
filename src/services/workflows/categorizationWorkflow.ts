@@ -10,7 +10,8 @@ export const runCategorizationWorkflow = async (
   contactIds?: string[],
   onProgress?: (progress: any) => void,
   cancellationToken?: CancellationToken,
-  contactLimit?: number
+  contactLimit?: number,
+  fastMode?: boolean // New parameter for faster processing
 ): Promise<number> => {
   console.log('Starting categorization workflow...');
   
@@ -39,10 +40,12 @@ export const runCategorizationWorkflow = async (
     
     progressTracker.initialize(totalContacts);
 
-    // Process contacts in batches
-    const batchSize = 50;
+    // Use larger batch sizes for faster processing when in fast mode
+    const batchSize = fastMode ? 200 : 50; // Much larger batches for uploads
     const totalBatches = Math.ceil(totalContacts / batchSize);
     let processedCount = 0;
+
+    console.log(`Processing ${totalContacts} contacts in ${totalBatches} batches of ${batchSize}`);
 
     for (let i = 0; i < totalBatches; i++) {
       // Check for cancellation
@@ -65,6 +68,11 @@ export const runCategorizationWorkflow = async (
       
       processedCount += batch.length;
       progressTracker.updateProgress(processedCount, i + 1, totalBatches);
+
+      // Reduce delay between batches in fast mode
+      if (!fastMode && i < totalBatches - 1) {
+        await new Promise(resolve => setTimeout(resolve, 10)); // Small delay only in normal mode
+      }
     }
 
     console.log(`Categorization workflow completed. Processed ${processedCount} contacts.`);

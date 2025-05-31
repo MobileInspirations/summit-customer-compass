@@ -8,7 +8,7 @@ export const categorizeNewContacts = async (contactEmails: string[]): Promise<vo
   console.log(`Getting contact IDs for ${contactEmails.length} emails...`);
   
   // Fetch contact IDs in chunks to avoid URL length limits
-  const chunkSize = 50; // Safe chunk size for URL length
+  const chunkSize = 100; // Increased chunk size for faster processing
   const allContactIds: string[] = [];
   
   for (let i = 0; i < contactEmails.length; i += chunkSize) {
@@ -38,6 +38,8 @@ export const categorizeNewContacts = async (contactEmails: string[]): Promise<vo
   console.log(`Successfully fetched ${allContactIds.length} contact IDs for categorization`);
 
   if (allContactIds.length > 0) {
-    await runCategorizationWorkflow(allContactIds);
+    // Use larger batch processing for newly uploaded contacts
+    console.log('Starting fast categorization for newly uploaded contacts...');
+    await runCategorizationWorkflow(allContactIds, undefined, undefined, undefined, true); // Pass fast mode flag
   }
 };
