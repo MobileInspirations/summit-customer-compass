@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { fetchContactsCount } from "@/services/data/contactDataService";
-import { fetchAllCategories } from "@/services/data/contactDataService";
+import { fetchAllCategories } from "@/services/data/categoryDataService";
 import { useAuth } from "@/hooks/useAuth";
 
 import { EnhancedDashboardHeader } from "@/components/Dashboard/EnhancedDashboardHeader";

@@ -55,6 +55,10 @@ export const getContactsCount = async (): Promise<number> => {
   return totalContacts || 0;
 };
 
+export const fetchContactsCount = async (): Promise<number> => {
+  return getContactsCount();
+};
+
 export const clearExistingCategorizations = async (): Promise<void> => {
   console.log('Clearing existing categorizations...');
   const { error: clearError } = await supabase
