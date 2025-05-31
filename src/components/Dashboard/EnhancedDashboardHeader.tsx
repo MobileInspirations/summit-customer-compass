@@ -1,6 +1,6 @@
 
 import { Button } from "@/components/ui/button";
-import { Upload, Users, ArrowUpDown, Download, Brain, Tags, LogOut, MoreHorizontal } from "lucide-react";
+import { Upload, ArrowUpDown, Download, Brain, Tags, LogOut, MoreHorizontal, Users } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -56,11 +56,6 @@ export const EnhancedDashboardHeader = ({
               Upload CSV
             </Button>
             
-            <Button onClick={onViewAllContacts} variant="outline">
-              <Users className="w-4 h-4 mr-2" />
-              View Contacts
-            </Button>
-            
             {/* Categorization Actions */}
             <div className="flex items-center space-x-2 border-l pl-3">
               <Button 
@@ -105,6 +100,11 @@ export const EnhancedDashboardHeader = ({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48 bg-white">
+                <DropdownMenuItem onClick={onViewAllContacts}>
+                  <Users className="w-4 h-4 mr-2" />
+                  View All Contacts
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem 
                   onClick={onSortContacts}
                   disabled={isSorting}

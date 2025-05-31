@@ -6,9 +6,12 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchContactsCount } from "@/services/data/contactDataService";
 import { fetchAllCategories } from "@/services/data/categoryDataService";
 import { useAuth } from "@/hooks/useAuth";
+import { useCategoriesByType } from "@/hooks/useCategories";
+import { useBucketCounts } from "@/hooks/useBucketCounts";
 
 import { EnhancedDashboardHeader } from "@/components/Dashboard/EnhancedDashboardHeader";
-import ContactsTable from "@/components/ContactsTable";
+import { BucketSelector } from "@/components/BucketSelector";
+import { CategoriesSection } from "@/components/Dashboard/CategoriesSection";
 import { UploadDialog } from "@/components/UploadDialog";
 import { ExportDialog } from "@/components/ExportDialog";
 import { AICategorizationDialog } from "@/components/AICategorizationDialog";
@@ -46,6 +49,10 @@ const Index = () => {
     queryFn: fetchAllCategories,
   });
 
+  const { data: customerCategories = [] } = useCategoriesByType("customer");
+  const { data: personalityCategories = [] } = useCategoriesByType("personality");
+  const { data: bucketCounts = {} } = useBucketCounts();
+
   const exportHandlers = useExportHandlers({
     setIsExporting: exportState.setIsExporting,
     setExportProgress: exportState.setExportProgress,
@@ -78,8 +85,20 @@ const Index = () => {
   };
 
   const handleViewAllContacts = () => {
+    navigate("/contacts");
+  };
+
+  const handleCategorySelect = (categoryId: string) => {
+    setSelectedCategories(prev => 
+      prev.includes(categoryId) 
+        ? prev.filter(id => id !== categoryId)
+        : [...prev, categoryId]
+    );
+  };
+
+  const handleBucketChange = (bucket: string) => {
+    setSelectedBucket(bucket);
     setSelectedCategories([]);
-    setSelectedBucket('biz-op');
   };
 
   const handleExport = () => {
@@ -120,7 +139,28 @@ const Index = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <ContactsTable />
+        {/* Bucket Selector */}
+        <BucketSelector 
+          selectedBucket={selectedBucket}
+          onBucketChange={handleBucketChange}
+          bucketCounts={bucketCounts}
+        />
+
+        {/* Customer Categories */}
+        <CategoriesSection
+          title="Customer Categories"
+          categories={customerCategories}
+          selectedCategories={selectedCategories}
+          onCategorySelect={handleCategorySelect}
+        />
+
+        {/* Personality Categories */}
+        <CategoriesSection
+          title="Personality Categories"
+          categories={personalityCategories}
+          selectedCategories={selectedCategories}
+          onCategorySelect={handleCategorySelect}
+        />
       </div>
 
       {/* Dialogs */}
