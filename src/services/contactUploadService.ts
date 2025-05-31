@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { ensureMainBucketsExist, type MainBucketId } from "./bucketCategorizationService";
 
@@ -37,8 +38,8 @@ export const uploadContacts = async (
   const uniqueContacts = Object.values(deduplicatedContacts);
   console.log(`After deduplication: ${uniqueContacts.length} unique contacts`);
 
-  // Process contacts in batches of 1000 for better performance with summit history
-  const batchSize = 1000;
+  // Process contacts in smaller batches to avoid "Bad Request" errors
+  const batchSize = 100; // Reduced from 1000 to avoid query limits
   let processed = 0;
   
   for (let i = 0; i < uniqueContacts.length; i += batchSize) {
@@ -47,7 +48,9 @@ export const uploadContacts = async (
     // Get emails for this batch to check existing contacts
     const batchEmails = batch.map(c => c.email);
     
-    // Fetch existing contacts for this batch
+    console.log(`Processing batch ${Math.floor(i / batchSize) + 1} with ${batchEmails.length} emails`);
+    
+    // Fetch existing contacts for this batch with smaller query
     const { data: existingContacts, error: fetchError } = await supabase
       .from('contacts')
       .select('*')
@@ -57,6 +60,8 @@ export const uploadContacts = async (
       console.error('Error fetching existing contacts:', fetchError);
       throw fetchError;
     }
+
+    console.log(`Found ${existingContacts?.length || 0} existing contacts in this batch`);
 
     // Create a map of existing contacts
     const existingContactsMap = new Map(
@@ -116,6 +121,8 @@ export const uploadContacts = async (
 
     processed += batch.length;
     onProgress(15 + (processed / uniqueContacts.length) * 85); // 15-100% for upload
+    
+    console.log(`Completed batch ${Math.floor(i / batchSize) + 1}, total processed: ${processed}`);
   }
 
   onProgress(100);
