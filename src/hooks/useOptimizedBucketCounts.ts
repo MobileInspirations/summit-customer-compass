@@ -36,12 +36,12 @@ export const useOptimizedBucketCounts = () => {
 
       // Try to use RPC function first
       const { data: rpcData, error: rpcError } = await supabase
-        .rpc('get_bucket_counts');
+        .rpc('get_bucket_counts') as { data: BucketCountResult[] | null; error: any };
 
       if (!rpcError && rpcData && Array.isArray(rpcData)) {
         console.log('Using RPC function for bucket counts');
         
-        rpcData.forEach((item: any) => {
+        for (const item of rpcData) {
           if (item && item.bucket && typeof item.count === 'number') {
             const bucket = item.bucket.toString();
             if (bucket === 'biz-op') result['biz-op'] = item.count;
@@ -49,7 +49,7 @@ export const useOptimizedBucketCounts = () => {
             else if (bucket === 'survivalist') result['survivalist'] = item.count;
             else if (bucket === 'cannot-place') result['cannot-place'] = item.count;
           }
-        });
+        }
 
         console.log('RPC bucket counts:', result);
         return result;
