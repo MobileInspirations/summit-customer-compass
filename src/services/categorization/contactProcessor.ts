@@ -2,22 +2,20 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { ContactForCategorization, CategoryData } from "../types/contactTypes";
 import { categorizeContactMandatoryBuckets, type ContactForRuleCategorization } from "../ruleBasedCategorizationService";
-import { deduplicateTags } from "../utils/tagUtils";
 
 export const categorizeContact = async (
   contact: ContactForCategorization, 
   categories: CategoryData[]
 ): Promise<void> => {
   console.log(`=== Categorizing contact: ${contact.email} ===`);
-  console.log(`Contact tags:`, contact.tags);
   console.log(`Contact summit_history:`, contact.summit_history);
   console.log(`Raw contact data:`, contact);
   
   const assignedCategories: string[] = [];
 
   try {
-    // Use the mandatory bucket categorization system with deduplicated tags
-    const allTags = deduplicateTags(contact.tags, contact.summit_history);
+    // Use the mandatory bucket categorization system with summit history
+    const allTags = contact.summit_history || [];
 
     const contactForRules: ContactForRuleCategorization = {
       id: contact.id,
@@ -25,8 +23,8 @@ export const categorizeContact = async (
     };
 
     console.log(`Prepared contact for rules:`, contactForRules);
-    console.log(`Combined tags array length:`, contactForRules.tags?.length);
-    console.log(`Combined tags (deduplicated):`, contactForRules.tags);
+    console.log(`Summit history tags array length:`, contactForRules.tags?.length);
+    console.log(`Summit history tags:`, contactForRules.tags);
 
     const mandatoryResult = categorizeContactMandatoryBuckets(contactForRules);
     console.log(`Mandatory categorization for ${contact.email}: Main=${mandatoryResult.mainBucket}, Personality=${mandatoryResult.personalityBucket}`);
