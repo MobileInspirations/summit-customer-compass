@@ -64,19 +64,22 @@ export const useExportHandlers = ({
 
     try {
       const exportedCategories = await exportAllTags((progress) => {
-        setExportProgress(prev => ({
-          ...prev,
+        setExportProgress({
           contactsProcessed: progress.contactsProcessed,
           totalContacts: progress.totalContacts,
-          tagsFound: progress.tagsFound
-        }));
+          tagsFound: progress.tagsFound,
+          isComplete: false,
+          isError: false
+        });
       });
       
-      setExportProgress(prev => ({
-        ...prev,
+      setExportProgress({
+        contactsProcessed: 0,
+        totalContacts: 0,
+        tagsFound: exportedCategories.length,
         isComplete: true,
         isError: false
-      }));
+      });
       
       toast({
         title: "Export complete",
@@ -84,11 +87,13 @@ export const useExportHandlers = ({
       });
     } catch (error) {
       console.error('Export error:', error);
-      setExportProgress(prev => ({
-        ...prev,
+      setExportProgress({
+        contactsProcessed: 0,
+        totalContacts: 0,
+        tagsFound: 0,
         isComplete: true,
         isError: true
-      }));
+      });
       toast({
         title: "Export failed",
         description: "Please try again or contact support.",

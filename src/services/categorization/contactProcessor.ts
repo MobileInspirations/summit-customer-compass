@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import type { ContactForCategorization, CategoryData } from "../types/contactTypes";
 import { shouldAssignToCategory } from "./categorizationLogic";

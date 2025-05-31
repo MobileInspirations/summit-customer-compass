@@ -4,6 +4,7 @@ import { fetchCategories } from "../data/contactDataService";
 import { categorizeContactBatch } from "../categorization/contactProcessor";
 import { ProgressTracker } from "../utils/progressTracker";
 import { CancellationToken } from "../utils/cancellationToken";
+import { errorLogger, timeOperation } from "../utils/errorLogger";
 
 export const runCategorizationWorkflow = async (
   contactIds?: string[],
@@ -16,13 +17,17 @@ export const runCategorizationWorkflow = async (
   const progressTracker = new ProgressTracker(onProgress);
   
   try {
-    // Fetch contacts and categories
-    const [contacts, categories] = await Promise.all([
-      contactIds ? 
-        fetchUncategorizedContacts().then(all => all.filter(c => contactIds.includes(c.id))) :
-        fetchUncategorizedContacts(contactLimit),
-      fetchCategories()
-    ]);
+    // Fetch contacts and categories with timing
+    const [contacts, categories] = await timeOperation(
+      'fetch-data',
+      async () => Promise.all([
+        contactIds ? 
+          fetchUncategorizedContacts().then(all => all.filter(c => contactIds.includes(c.id))) :
+          fetchUncategorizedContacts(contactLimit),
+        fetchCategories()
+      ]),
+      { contactIds: contactIds?.length, contactLimit }
+    );
 
     if (!contacts.length) {
       console.log('No contacts to categorize');
@@ -52,7 +57,11 @@ export const runCategorizationWorkflow = async (
 
       console.log(`Processing batch ${i + 1}/${totalBatches} (${batch.length} contacts)`);
 
-      await categorizeContactBatch(batch, categories);
+      await timeOperation(
+        `categorize-batch-${i + 1}`,
+        () => categorizeContactBatch(batch, categories),
+        { batchSize: batch.length, batchIndex: i + 1 }
+      );
       
       processedCount += batch.length;
       progressTracker.updateProgress(processedCount, i + 1, totalBatches);
@@ -62,6 +71,7 @@ export const runCategorizationWorkflow = async (
     return processedCount;
     
   } catch (error) {
+    errorLogger.log('categorization-workflow', error as Error, { contactIds: contactIds?.length, contactLimit });
     console.error('Error in categorization workflow:', error);
     throw error;
   }

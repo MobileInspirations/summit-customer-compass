@@ -1,54 +1,58 @@
+import { useState, useEffect } from "react";
+import { useSession, signOut } from "next-auth/react";
+import { useRouter } from "next/router";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { useState } from "react";
-import { useToast } from "@/hooks/use-toast";
-import { useNavigate } from "react-router-dom";
-import { useCategoriesByType } from "@/hooks/useCategories";
-import { useContactsCount } from "@/hooks/useContacts";
-import { useBucketCounts } from "@/hooks/useBucketCounts";
-import { useAuth } from "@/hooks/useAuth";
-import { useCategorizationState } from "@/hooks/useCategorizationState";
-import { useExportState } from "@/hooks/useExportState";
-import { useDialogState } from "@/hooks/useDialogState";
-import { useCategorizationHandlers } from "@/components/Dashboard/CategorizationHandlers";
-import { useExportHandlers } from "@/components/Dashboard/ExportHandlers";
+import { fetchContactsCount } from "@/services/data/contactDataService";
+import { fetchAllCategories } from "@/services/data/categoryDataService";
+import { MainBucketId } from "@/services/types/contactTypes";
+
 import { EnhancedDashboardHeader } from "@/components/Dashboard/EnhancedDashboardHeader";
-import { StatsCards } from "@/components/Dashboard/StatsCards";
-import { CategoriesSection } from "@/components/Dashboard/CategoriesSection";
-import { BucketSelector } from "@/components/BucketSelector";
-import { UploadDialog } from "@/components/UploadDialog";
-import { ExportDialog } from "@/components/ExportDialog";
-import { CategorizationProgress } from "@/components/CategorizationProgress";
-import { ExportProgress } from "@/components/ExportProgress";
-import { AICategorizationDialog } from "@/components/AICategorizationDialog";
+import { ContactsTable } from "@/components/Dashboard/ContactsTable";
+import { UploadDialog } from "@/components/Dashboard/UploadDialog";
+import { ExportDialog } from "@/components/Dashboard/ExportDialog";
+import { AICategorizationDialog } from "@/components/Dashboard/AICategorizationDialog";
 import { ContactLimitDialog } from "@/components/ContactLimitDialog";
-import { EmailCleaningProgress } from "@/components/EmailCleaningProgress";
-import { CategorizationResultsDialog } from "@/components/CategorizationResultsDialog";
-import type { MainBucketId } from "@/services/bucketCategorizationService";
+import { CategorizationResultsDialog } from "@/components/Dashboard/CategorizationResultsDialog";
+import { useDialogState } from "@/hooks/useDialogState";
+import { useExportState } from "@/hooks/useExportState";
+import { useCategorizationState } from "@/hooks/useCategorizationState";
+import { useExportHandlers } from "@/components/Dashboard/ExportHandlers";
+import { useCategorizationHandlers } from "@/components/Dashboard/CategorizationHandlers";
+import { AlertTriangle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ErrorLogViewer } from "@/components/ErrorLogViewer";
 
 const Index = () => {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedBucket, setSelectedBucket] = useState<MainBucketId>('biz-op');
   const [isSorting, setIsSorting] = useState(false);
+  const [showErrorLogs, setShowErrorLogs] = useState(false);
   
-  const { toast } = useToast();
-  const { signOut } = useAuth();
-  const navigate = useNavigate();
-
-  // Custom hooks for state management
-  const categorizationState = useCategorizationState();
-  const exportState = useExportState();
+  const { data: session } = useSession();
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const dialogState = useDialogState();
+  const exportState = useExportState();
+  const categorizationState = useCategorizationState();
 
-  // Fetch data from Supabase
-  const { data: customerCategories = [], isLoading: customerLoading } = useCategoriesByType("customer");
-  const { data: personalityCategories = [], isLoading: personalityLoading } = useCategoriesByType("personality");
-  const { data: totalContacts = 0, isLoading: contactsLoading } = useContactsCount();
-  const { data: bucketCounts = {}, isLoading: bucketCountsLoading } = useBucketCounts();
+  const { data: contactsCount } = useQuery({
+    queryKey: ["contacts-count"],
+    queryFn: fetchContactsCount,
+  });
 
-  const allCategories = [...customerCategories, ...personalityCategories];
-  const isLoading = customerLoading || personalityLoading || contactsLoading || bucketCountsLoading;
+  const { data: allCategories = [] } = useQuery({
+    queryKey: ["categories"],
+    queryFn: fetchAllCategories,
+  });
 
-  // Event handlers
+  const exportHandlers = useExportHandlers({
+    setIsExporting: exportState.setIsExporting,
+    setExportProgress: exportState.setExportProgress,
+    selectedCategories: selectedCategories,
+    allCategories: allCategories
+  });
+
   const categorizationHandlers = useCategorizationHandlers({
     setIsCategorizing: categorizationState.setIsCategorizing,
     setCategorizationProgress: categorizationState.setCategorizationProgress,
@@ -58,19 +62,24 @@ const Index = () => {
     resetProgress: categorizationState.resetProgress
   });
 
-  const exportHandlers = useExportHandlers({
-    setIsExporting: exportState.setIsExporting,
-    setExportProgress: exportState.setExportProgress,
-    selectedCategories,
-    allCategories
-  });
+  useEffect(() => {
+    if (!session) {
+      router.push("/login");
+    }
+  }, [session, router]);
 
-  const handleCategorySelect = (categoryId: string) => {
-    setSelectedCategories(prev => 
-      prev.includes(categoryId) 
-        ? prev.filter(id => id !== categoryId)
-        : [...prev, categoryId]
-    );
+  if (!session) {
+    return null;
+  }
+
+  const handleSignOut = async () => {
+    await signOut({ redirect: false });
+    router.push("/login");
+  };
+
+  const handleViewAllContacts = () => {
+    setSelectedCategories([]);
+    setSelectedBucket('biz-op');
   };
 
   const handleExport = () => {
@@ -79,22 +88,6 @@ const Index = () => {
       dialogState.setShowExportDialog(true);
     }
   };
-
-  const handleViewAllContacts = () => {
-    navigate("/contacts");
-  };
-
-  const handleSignOut = async () => {
-    await signOut();
-    toast({
-      title: "Signed out",
-      description: "You have been successfully signed out.",
-    });
-  };
-
-  const selectedCount = allCategories
-    .filter(cat => selectedCategories.includes(cat.id))
-    .reduce((sum, cat) => sum + cat.count, 0);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -113,33 +106,33 @@ const Index = () => {
         isCategorizing={categorizationState.isCategorizing}
       />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <StatsCards 
-          totalContacts={totalContacts}
-          categoriesCount={allCategories.length}
-          selectedCount={selectedCount}
-        />
-
-        <CategoriesSection
-          title="Customer Categories"
-          categories={customerCategories}
-          selectedCategories={selectedCategories}
-          onCategorySelect={handleCategorySelect}
-        />
-
-        <CategoriesSection
-          title="Personality Type Buckets"
-          categories={personalityCategories}
-          selectedCategories={selectedCategories}
-          onCategorySelect={handleCategorySelect}
-        />
-
-        <BucketSelector
-          selectedBucket={selectedBucket}
-          onBucketChange={(bucket) => setSelectedBucket(bucket as MainBucketId)}
-          bucketCounts={bucketCounts}
-        />
+      {/* Error Logs Button */}
+      <div className="fixed bottom-4 right-4 z-50">
+        <Button
+          onClick={() => setShowErrorLogs(true)}
+          variant="outline"
+          size="sm"
+          className="bg-white shadow-lg"
+        >
+          <AlertTriangle className="h-4 w-4 mr-2" />
+          Error Logs
+        </Button>
       </div>
+
+      <ContactsTable
+        selectedCategories={selectedCategories}
+        setSelectedCategories={setSelectedCategories}
+        selectedBucket={selectedBucket}
+        setSelectedBucket={setSelectedBucket}
+        isSorting={isSorting}
+        setIsSorting={setIsSorting}
+        isExporting={exportState.isExporting}
+        isCategorizing={categorizationState.isCategorizing}
+        onStopCategorization={categorizationHandlers.handleStopCategorization}
+        categorizationProgress={categorizationState.categorizationProgress}
+        contactsCount={contactsCount}
+        allCategories={allCategories}
+      />
 
       {/* Dialogs */}
       <UploadDialog 
@@ -171,33 +164,33 @@ const Index = () => {
         onOpenChange={categorizationState.setShowResultsDialog}
         results={categorizationState.categorizationResults}
       />
+      <ErrorLogViewer
+        open={showErrorLogs}
+        onOpenChange={setShowErrorLogs}
+      />
 
-      {/* Progress Components */}
-      <CategorizationProgress
-        isVisible={categorizationState.isCategorizing}
-        progress={categorizationState.categorizationProgress.progress}
-        currentBatch={categorizationState.categorizationProgress.currentBatch}
-        totalBatches={categorizationState.categorizationProgress.totalBatches}
-        processedCount={categorizationState.categorizationProgress.processedCount}
-        totalCount={categorizationState.categorizationProgress.totalCount}
-        onStop={categorizationState.isCategorizing ? categorizationHandlers.handleStopCategorization : undefined}
-      />
-      <ExportProgress
-        isVisible={exportState.isExporting || exportState.exportProgress.isComplete}
-        isComplete={exportState.exportProgress.isComplete}
-        isError={exportState.exportProgress.isError}
-        contactsProcessed={exportState.exportProgress.contactsProcessed}
-        totalContacts={exportState.exportProgress.totalContacts}
-        tagsFound={exportState.exportProgress.tagsFound}
-      />
-      <EmailCleaningProgress
-        isVisible={exportState.emailCleaningProgress.isActive}
-        isComplete={exportState.emailCleaningProgress.isComplete}
-        isError={exportState.emailCleaningProgress.isError}
-        processed={exportState.emailCleaningProgress.processed}
-        total={exportState.emailCleaningProgress.total}
-        validEmails={exportState.emailCleaningProgress.validEmails}
-      />
+      {exportState.isExporting && (
+        <div className="fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 p-4">
+          <p className="text-sm text-gray-500">
+            Exporting contacts... {exportState.exportProgress.contactsProcessed} / {exportState.exportProgress.totalContacts} contacts processed.
+            {exportState.exportProgress.isComplete && !exportState.exportProgress.isError && (
+              <span className="text-green-500"> Export complete!</span>
+            )}
+            {exportState.exportProgress.isError && (
+              <span className="text-red-500"> Export failed. Please try again.</span>
+            )}
+          </p>
+        </div>
+      )}
+
+      {categorizationState.isCategorizing && (
+        <div className="fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 p-4">
+          <p className="text-sm text-gray-500">
+            Categorizing contacts... {categorizationState.categorizationProgress.processedCount} / {categorizationState.categorizationProgress.totalCount} contacts processed.
+            (Batch {categorizationState.categorizationProgress.currentBatch} of {categorizationState.categorizationProgress.totalBatches})
+          </p>
+        </div>
+      )}
     </div>
   );
 };
