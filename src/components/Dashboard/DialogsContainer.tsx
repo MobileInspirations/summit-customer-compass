@@ -19,7 +19,7 @@ interface DialogsContainerProps {
   selectedCategories: string[];
   allCategories: any[];
   exportState: {
-    handleEmailCleaningProgress: (progress: any) => void;
+    handleEmailCleaningProgress: (processed: number, total: number, validEmails: number) => void;
   };
   categorizationState: {
     showResultsDialog: boolean;
