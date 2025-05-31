@@ -2,28 +2,20 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-// Define the expected RPC return type
-interface BucketCountResult {
+// Simple interface for the expected response
+interface BucketCount {
   bucket: string;
   count: number;
 }
 
-// Define the bucket counts type
-type BucketCounts = {
-  'biz-op': number;
-  'health': number;
-  'survivalist': number;
-  'cannot-place': number;
-};
-
 export const useOptimizedBucketCounts = () => {
   return useQuery({
     queryKey: ["optimized-bucket-counts"],
-    queryFn: async (): Promise<BucketCounts> => {
+    queryFn: async () => {
       console.log('=== Starting optimized bucket counts calculation ===');
       
-      // Initialize with explicit type annotation
-      const result: BucketCounts = {
+      // Create a simple object to hold counts
+      const counts = {
         'biz-op': 0,
         'health': 0,
         'survivalist': 0,
@@ -42,94 +34,66 @@ export const useOptimizedBucketCounts = () => {
 
       console.log('Total contacts in database:', totalCount);
 
-      // Try to use RPC function first
-      const { data: rpcData, error: rpcError } = await supabase
-        .rpc('get_bucket_counts');
+      // Try RPC function first
+      const { data: rpcData, error: rpcError } = await supabase.rpc('get_bucket_counts');
 
-      if (!rpcError && rpcData && Array.isArray(rpcData)) {
+      if (!rpcError && rpcData) {
         console.log('Using RPC function for bucket counts');
+        console.log('RPC Data:', rpcData);
         
-        for (const item of rpcData as BucketCountResult[]) {
-          if (item && item.bucket && typeof item.count === 'number') {
-            const bucket = item.bucket.toString();
-            if (bucket === 'biz-op') result['biz-op'] = item.count;
-            else if (bucket === 'health') result['health'] = item.count;
-            else if (bucket === 'survivalist') result['survivalist'] = item.count;
-            else if (bucket === 'cannot-place') result['cannot-place'] = item.count;
-          }
+        // Process RPC data safely
+        if (Array.isArray(rpcData)) {
+          rpcData.forEach((item: any) => {
+            if (item?.bucket && typeof item?.count === 'number') {
+              const bucketName = String(item.bucket).toLowerCase();
+              if (bucketName === 'biz-op') counts['biz-op'] = item.count;
+              else if (bucketName === 'health') counts['health'] = item.count;
+              else if (bucketName === 'survivalist') counts['survivalist'] = item.count;
+              else if (bucketName === 'cannot-place') counts['cannot-place'] = item.count;
+            }
+          });
         }
 
-        console.log('RPC bucket counts:', result);
-        return result;
+        console.log('RPC bucket counts:', counts);
+        return counts;
       }
 
       // Fallback: Manual counting
       console.warn("RPC function not available, falling back to manual counting:", rpcError);
       
-      // Fetch all main_bucket values in batches
-      const allBuckets: string[] = [];
-      let from = 0;
-      const batchSize = 1000;
+      // Get all bucket values in one query
+      const { data: allContacts, error: fetchError } = await supabase
+        .from("contacts")
+        .select("main_bucket");
 
-      while (true) {
-        const { data: batch, error: fetchError } = await supabase
-          .from("contacts")
-          .select("main_bucket")
-          .range(from, from + batchSize - 1);
-
-        if (fetchError) {
-          console.error("Error fetching bucket batch:", fetchError);
-          throw fetchError;
-        }
-
-        if (!batch || batch.length === 0) {
-          break;
-        }
-
-        // Filter out null/undefined values and add to allBuckets
-        const validBuckets = batch
-          .map(contact => contact.main_bucket)
-          .filter((bucket): bucket is string => bucket !== null && bucket !== undefined);
-        
-        allBuckets.push(...validBuckets);
-        console.log(`Fetched bucket batch: ${batch.length} (total: ${allBuckets.length})`);
-
-        if (batch.length < batchSize) {
-          break;
-        }
-
-        from += batchSize;
+      if (fetchError) {
+        console.error("Error fetching contacts:", fetchError);
+        throw fetchError;
       }
 
-      // Count buckets manually
-      for (const bucket of allBuckets) {
-        if (!bucket) continue;
-        
-        const normalizedBucket = bucket.toLowerCase().trim();
-        
-        if (normalizedBucket === 'biz-op' || 
-            normalizedBucket === 'biz' || 
-            normalizedBucket === 'business operations' || 
-            normalizedBucket === 'business-operations' ||
-            normalizedBucket === 'business_operations' ||
-            normalizedBucket === 'businessoperations') {
-          result['biz-op']++;
-        } else if (normalizedBucket === 'health' || normalizedBucket === 'health and wellness') {
-          result['health']++;
-        } else if (normalizedBucket === 'survivalist' || normalizedBucket === 'survival' || normalizedBucket === 'emergency preparedness') {
-          result['survivalist']++;
-        } else if (normalizedBucket === 'cannot-place' || normalizedBucket === 'cannot place' || normalizedBucket === 'unassigned') {
-          result['cannot-place']++;
-        } else {
-          console.log('Unknown bucket value:', bucket, '- assigning to biz-op');
-          result['biz-op']++;
-        }
+      // Count each bucket manually
+      if (allContacts) {
+        allContacts.forEach(contact => {
+          if (contact.main_bucket) {
+            const bucket = contact.main_bucket.toLowerCase().trim();
+            
+            if (bucket === 'biz-op' || bucket === 'biz' || bucket === 'business operations') {
+              counts['biz-op']++;
+            } else if (bucket === 'health' || bucket === 'health and wellness') {
+              counts['health']++;
+            } else if (bucket === 'survivalist' || bucket === 'survival') {
+              counts['survivalist']++;
+            } else if (bucket === 'cannot-place' || bucket === 'cannot place') {
+              counts['cannot-place']++;
+            } else {
+              counts['biz-op']++; // Default unknown to biz-op
+            }
+          }
+        });
       }
 
-      console.log('Final optimized bucket counts:', result);
-      console.log('Total counted contacts:', Object.values(result).reduce((sum, count) => sum + count, 0));
-      
-      return result;
+      console.log('Final bucket counts:', counts);
+      return counts;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
