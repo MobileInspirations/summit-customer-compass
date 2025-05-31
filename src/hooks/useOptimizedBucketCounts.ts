@@ -36,7 +36,6 @@ export const useOptimizedBucketCounts = () => {
           const { data: batch, error: fetchError } = await supabase
             .from("contacts")
             .select("main_bucket")
-            .not('main_bucket', 'is', null)
             .range(from, from + batchSize - 1);
 
           if (fetchError) {
@@ -48,7 +47,12 @@ export const useOptimizedBucketCounts = () => {
             break;
           }
 
-          allBuckets = allBuckets.concat(batch.map(contact => contact.main_bucket).filter(Boolean));
+          // Filter out null/undefined values and add to allBuckets
+          const validBuckets = batch
+            .map(contact => contact.main_bucket)
+            .filter((bucket): bucket is string => bucket !== null && bucket !== undefined);
+          
+          allBuckets = allBuckets.concat(validBuckets);
           console.log(`Fetched bucket batch: ${batch.length} (total: ${allBuckets.length})`);
 
           if (batch.length < batchSize) {
@@ -104,8 +108,11 @@ export const useOptimizedBucketCounts = () => {
         'cannot-place': 0
       };
 
-      if (bucketStats && Array.isArray(bucketStats)) {
-        bucketStats.forEach((stat: any) => {
+      // Type the bucketStats properly
+      const stats = bucketStats as Array<{ bucket: string; count: number }> | null;
+      
+      if (stats && Array.isArray(stats)) {
+        stats.forEach((stat) => {
           if (stat && stat.bucket && typeof stat.count === 'number') {
             bucketCounts[stat.bucket] = stat.count;
           }
