@@ -5,7 +5,6 @@ export interface ContactForCategorization {
   full_name?: string;
   company?: string;
   summit_history?: string[];
-  tags?: string[];
 }
 
 export interface CategoryData {

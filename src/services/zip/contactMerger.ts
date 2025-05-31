@@ -6,8 +6,7 @@ export const groupContactsByBucket = (contacts: ProcessedContact[]): Record<Main
   const grouped: Record<MainBucketId, ProcessedContact[]> = {
     'biz-op': [],
     health: [],
-    survivalist: [],
-    'cannot-place': []
+    survivalist: []
   };
 
   contacts.forEach(contact => {
@@ -35,14 +34,12 @@ export const mergeContactsByEmail = (contacts: ProcessedContact[]): Record<strin
         company: contact.company || existing.company,
         summit_history: [...new Set([...existing.summit_history, ...contact.summit_history])],
         engagement_level: contact.engagement_level || existing.engagement_level,
-        tags: [...new Set([...existing.tags, ...contact.tags])],
         bucket: contact.bucket, // Use the most recent bucket assignment
         folder_path: [...new Set([...existing.folder_path, ...contact.folder_path])]
       };
       
       console.log(`Merged contact ${contact.email}:`, {
         summitHistoryCount: merged[contact.email].summit_history.length,
-        tagsCount: merged[contact.email].tags.length,
         folderPathCount: merged[contact.email].folder_path.length
       });
     }

@@ -12,7 +12,6 @@ export const fetchUncategorizedContacts = async (contactLimit?: number): Promise
       email,
       full_name,
       company,
-      tags,
       summit_history,
       engagement_level
     `)
@@ -38,8 +37,6 @@ export const fetchUncategorizedContacts = async (contactLimit?: number): Promise
     email: contact.email,
     full_name: contact.full_name,
     company: contact.company,
-    tags: contact.tags || [],
     summit_history: contact.summit_history || [],
-    engagement_level: contact.engagement_level
   })) || [];
 };
