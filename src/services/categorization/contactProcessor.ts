@@ -10,6 +10,7 @@ export const categorizeContact = async (
   console.log(`=== Categorizing contact: ${contact.email} ===`);
   console.log(`Contact tags:`, contact.tags);
   console.log(`Contact summit_history:`, contact.summit_history);
+  console.log(`Raw contact data:`, contact);
   
   const assignedCategories: string[] = [];
 
@@ -21,6 +22,8 @@ export const categorizeContact = async (
     };
 
     console.log(`Prepared contact for rules:`, contactForRules);
+    console.log(`Tags array length:`, contactForRules.tags?.length);
+    console.log(`Individual tags:`, contactForRules.tags);
 
     const mandatoryResult = categorizeContactMandatoryBuckets(contactForRules);
     console.log(`Mandatory categorization for ${contact.email}: Main=${mandatoryResult.mainBucket}, Personality=${mandatoryResult.personalityBucket}`);
@@ -33,6 +36,9 @@ export const categorizeContact = async (
       cat.name === mandatoryResult.personalityBucket && cat.category_type === 'personality'
     );
 
+    console.log(`Available categories:`, categories.map(c => `${c.name} (${c.category_type})`));
+    console.log(`Looking for main bucket: "${mandatoryResult.mainBucket}" with type "customer"`);
+    console.log(`Looking for personality bucket: "${mandatoryResult.personalityBucket}" with type "personality"`);
     console.log(`Found main bucket category:`, mainBucketCategory);
     console.log(`Found personality bucket category:`, personalityBucketCategory);
 
@@ -85,6 +91,8 @@ export const categorizeContact = async (
         contact_id: contact.id,
         category_id: categoryId
       }));
+
+      console.log(`About to insert:`, contactCategoryRecords);
 
       const { error } = await supabase
         .from('contact_categories')
