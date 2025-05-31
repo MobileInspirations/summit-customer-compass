@@ -18,6 +18,7 @@ import { ExportDialog } from "@/components/ExportDialog";
 import { CategorizationProgress } from "@/components/CategorizationProgress";
 import { ExportProgress } from "@/components/ExportProgress";
 import { AICategorizationDialog } from "@/components/AICategorizationDialog";
+import { ContactLimitDialog } from "@/components/ContactLimitDialog";
 import type { MainBucketId } from "@/services/bucketCategorizationService";
 import { EmailCleaningProgress } from "@/components/EmailCleaningProgress";
 
@@ -26,6 +27,7 @@ const Index = () => {
   const [selectedBucket, setSelectedBucket] = useState<MainBucketId>('biz-op');
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
+  const [showContactLimitDialog, setShowContactLimitDialog] = useState(false);
   const [isCategorizing, setIsCategorizing] = useState(false);
   const [isSorting, setIsSorting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -99,7 +101,11 @@ const Index = () => {
   };
 
   // Regular rule-based categorization (NO AI, NO API KEY REQUIRED)
-  const handleCategorizeAll = async () => {
+  const handleCategorizeAll = () => {
+    setShowContactLimitDialog(true);
+  };
+
+  const handleContactLimitCategorization = async (contactLimit?: number) => {
     setIsCategorizing(true);
     setCategorizationProgress({
       progress: 0,
@@ -121,12 +127,13 @@ const Index = () => {
         }, 
         false, // useAI = false for regular categorization
         undefined, // no API key needed
-        cancellationTokenRef.current
+        cancellationTokenRef.current,
+        contactLimit // pass the contact limit
       );
       queryClient.invalidateQueries({ queryKey: ["categories"] });
       toast({
         title: "Categorization complete",
-        description: "All contacts have been automatically categorized into appropriate buckets.",
+        description: `Contacts have been automatically categorized into appropriate buckets${contactLimit ? ` (limited to ${contactLimit} contacts)` : ''}.`,
       });
     } catch (error) {
       if (error instanceof Error && error.message === 'Operation was cancelled') {
@@ -155,7 +162,7 @@ const Index = () => {
   };
 
   // AI-based categorization (USES STORED API KEY FROM SUPABASE)
-  const handleAICategorizeAll = async () => {
+  const handleAICategorizeAll = async (contactLimit?: number) => {
     setIsCategorizing(true);
     setCategorizationProgress({
       progress: 0,
@@ -177,12 +184,13 @@ const Index = () => {
         }, 
         true, // useAI = true for AI categorization
         undefined, // API key will be retrieved from Supabase secrets
-        cancellationTokenRef.current
+        cancellationTokenRef.current,
+        contactLimit // pass the contact limit
       );
       queryClient.invalidateQueries({ queryKey: ["categories"] });
       toast({
         title: "AI Categorization complete",
-        description: "All contacts have been categorized using AI into personality type buckets.",
+        description: `Contacts have been categorized using AI into personality type buckets${contactLimit ? ` (limited to ${contactLimit} contacts)` : ''}.`,
       });
     } catch (error) {
       if (error instanceof Error && error.message === 'Operation was cancelled') {
@@ -315,6 +323,8 @@ const Index = () => {
     });
   };
 
+  const [showAICategorizationDialog, setShowAICategorizationDialog] = useState(false);
+
   return (
     <div className="min-h-screen bg-gray-50">
       <EnhancedDashboardHeader
@@ -323,7 +333,7 @@ const Index = () => {
         onSortContacts={handleSortContacts}
         onExportAllTags={handleExportAllTags}
         onCategorizeAll={handleCategorizeAll}
-        onAICategorizeAll={handleAICategorizeAll}
+        onAICategorizeAll={() => setShowAICategorizationDialog(true)}
         onExport={handleExport}
         onSignOut={handleSignOut}
         selectedCategoriesCount={selectedCategories.length}
@@ -373,9 +383,16 @@ const Index = () => {
         onEmailCleaningProgress={handleEmailCleaningProgress}
       />
       <AICategorizationDialog
-        open={false}
-        onOpenChange={() => {}}
-        onCategorize={() => {}}
+        open={showAICategorizationDialog}
+        onOpenChange={setShowAICategorizationDialog}
+        onCategorize={handleAICategorizeAll}
+      />
+      <ContactLimitDialog
+        open={showContactLimitDialog}
+        onOpenChange={setShowContactLimitDialog}
+        onCategorize={handleContactLimitCategorization}
+        title="Auto Categorization"
+        description="Select how many contacts to categorize using rule-based logic."
       />
       <CategorizationProgress
         isVisible={isCategorizing}

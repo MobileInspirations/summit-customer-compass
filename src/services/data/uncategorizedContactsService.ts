@@ -26,7 +26,43 @@ export const fetchUncategorizedContacts = async (contactIds?: string[], limit?: 
     return contacts || [];
   }
 
-  // For large datasets, we need to fetch in batches due to Supabase limitations
+  // If we have a limit under 1000, we can optimize by using the limit directly in the query
+  if (limit && limit < 1000) {
+    console.log(`Using optimized query with limit ${limit}`);
+    
+    const { data: contacts, error } = await supabase
+      .from('contacts')
+      .select(`
+        id, 
+        email, 
+        full_name, 
+        company, 
+        summit_history,
+        contact_categories!left (contact_id)
+      `)
+      .is('contact_categories.contact_id', null)
+      .order('created_at', { ascending: true })
+      .limit(limit);
+
+    if (error) {
+      console.error('Error fetching uncategorized contacts with limit:', error);
+      throw error;
+    }
+
+    // Transform the data to remove the join column
+    const uncategorizedContacts = (contacts || []).map(contact => ({
+      id: contact.id,
+      email: contact.email,
+      full_name: contact.full_name,
+      company: contact.company,
+      summit_history: contact.summit_history
+    }));
+
+    console.log(`Fetched ${uncategorizedContacts.length} uncategorized contacts with limit ${limit}`);
+    return uncategorizedContacts;
+  }
+
+  // For large datasets or no limit, we need to fetch in batches due to Supabase limitations
   let allUncategorizedContacts: any[] = [];
   let hasMore = true;
   let offset = 0;

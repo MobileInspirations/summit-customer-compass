@@ -17,7 +17,7 @@ export const categorizeContacts = async (
   cancellationToken?: CancellationToken,
   contactLimit?: number
 ) => {
-  if (useAI && openaiApiKey) {
+  if (useAI) {
     return runEnhancedCategorizationWorkflow(contactIds, useAI, openaiApiKey, onProgress, cancellationToken, contactLimit);
   } else {
     return runCategorizationWorkflow(contactIds, onProgress, cancellationToken, contactLimit);
