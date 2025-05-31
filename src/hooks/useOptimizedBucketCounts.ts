@@ -30,10 +30,18 @@ export const useOptimizedBucketCounts = () => {
 
       // Use database aggregation with proper typing
       const { data: bucketStats, error } = await supabase
-        .rpc('get_bucket_counts') as { data: BucketCountResult[] | null; error: any };
+        .rpc('get_bucket_counts');
 
       if (error) {
         console.warn("RPC function not available, falling back to manual counting:", error);
+        
+        // Initialize bucket counts with explicit typing
+        const bucketCounts: Record<BucketKey, number> = {
+          'biz-op': 0,
+          'health': 0,
+          'survivalist': 0,
+          'cannot-place': 0
+        };
         
         // Fallback: Fetch all main_bucket values in batches
         let allBuckets: string[] = [];
@@ -71,13 +79,6 @@ export const useOptimizedBucketCounts = () => {
         }
 
         // Count buckets manually with proper typing
-        const bucketCounts: Record<BucketKey, number> = {
-          'biz-op': 0,
-          'health': 0,
-          'survivalist': 0,
-          'cannot-place': 0
-        };
-
         allBuckets.forEach(bucket => {
           if (!bucket) return;
           
@@ -118,7 +119,7 @@ export const useOptimizedBucketCounts = () => {
 
       // Process bucketStats if available
       if (bucketStats && Array.isArray(bucketStats)) {
-        bucketStats.forEach((stat: BucketCountResult) => {
+        (bucketStats as BucketCountResult[]).forEach((stat: BucketCountResult) => {
           if (stat && stat.bucket && typeof stat.count === 'number') {
             const bucketKey = stat.bucket as BucketKey;
             if (bucketKey in bucketCounts) {
