@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,48 +9,94 @@ import { UploadProgress } from "@/components/UploadProgress";
 import { FileUploadSection } from "./FileUploadSection";
 import type { MainBucketId } from "@/services/bucketCategorizationService";
 
-// Enhanced CSV parser function for single file uploads
+// Enhanced CSV parser function that properly handles comma-separated values within columns
 const parseCSV = (csvContent: string) => {
   const lines = csvContent.split('\n').filter(line => line.trim());
   if (lines.length <= 1) return [];
 
-  const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+  // Parse the header row to identify column positions
+  const headerLine = lines[0];
+  const headers = parseCSVLine(headerLine).map(h => h.trim().toLowerCase());
+  
+  console.log('Detected CSV headers:', headers);
+  
   const emailIndex = headers.findIndex(h => h.includes('email'));
+  const nameIndex = headers.findIndex(h => h.includes('first name') || h.includes('name'));
+  const companyIndex = headers.findIndex(h => h.includes('company') || h.includes('organization'));
+  const tagsIndex = headers.findIndex(h => h.includes('contact tags') || h.includes('tags'));
+
+  console.log('Column indices:', { emailIndex, nameIndex, companyIndex, tagsIndex });
   
   if (emailIndex === -1) {
     throw new Error("CSV must contain an 'Email' column");
   }
 
-  const nameIndex = headers.findIndex(h => h.includes('name') || h.includes('first'));
-  const companyIndex = headers.findIndex(h => h.includes('company') || h.includes('organization'));
-  const summitHistoryIndex = headers.findIndex(h => h.includes('summit') || h.includes('tag') || h.includes('history'));
-
   const contacts = [];
   for (let i = 1; i < lines.length; i++) {
-    const values = lines[i].split(',').map(v => v.trim());
-    const email = values[emailIndex];
+    const values = parseCSVLine(lines[i]);
+    const email = values[emailIndex]?.trim();
     
     if (email && email.includes('@')) {
-      // Enhanced summit history extraction from CSV
+      // Extract summit history from Contact Tags column
       let summitHistory: string[] = [];
-      if (summitHistoryIndex !== -1 && values[summitHistoryIndex]) {
-        // Split by semicolon, comma, or pipe to support multiple summit formats
-        summitHistory = values[summitHistoryIndex]
-          .split(/[;,|]/)
-          .map(s => s.trim())
-          .filter(s => s.length > 0);
+      if (tagsIndex !== -1 && values[tagsIndex]) {
+        // Split the tags by comma and clean them up
+        summitHistory = values[tagsIndex]
+          .split(',')
+          .map(tag => tag.trim())
+          .filter(tag => tag.length > 0);
+        
+        console.log(`Contact ${email} tags:`, summitHistory);
       }
 
       contacts.push({
         email,
-        name: nameIndex !== -1 ? values[nameIndex] : '',
-        company: companyIndex !== -1 ? values[companyIndex] : '',
+        name: nameIndex !== -1 ? values[nameIndex]?.trim() || '' : '',
+        company: companyIndex !== -1 ? values[companyIndex]?.trim() || '' : '',
         summit_history: summitHistory
       });
     }
   }
   
+  console.log(`Parsed ${contacts.length} contacts with summit history`);
   return contacts;
+};
+
+// Helper function to properly parse a CSV line, handling quoted fields
+const parseCSVLine = (line: string): string[] => {
+  const result = [];
+  let current = '';
+  let inQuotes = false;
+  let i = 0;
+
+  while (i < line.length) {
+    const char = line[i];
+    const nextChar = line[i + 1];
+
+    if (char === '"') {
+      if (inQuotes && nextChar === '"') {
+        // Handle escaped quotes
+        current += '"';
+        i += 2;
+        continue;
+      } else {
+        // Toggle quote state
+        inQuotes = !inQuotes;
+      }
+    } else if (char === ',' && !inQuotes) {
+      // Field separator found outside quotes
+      result.push(current);
+      current = '';
+    } else {
+      current += char;
+    }
+    i++;
+  }
+
+  // Add the last field
+  result.push(current);
+  
+  return result;
 };
 
 interface UploadFormProps {
@@ -61,6 +106,7 @@ interface UploadFormProps {
 }
 
 export const UploadForm = ({ onClose, onUploadComplete, bucketCounts }: UploadFormProps) => {
+  // ... keep existing code (state declarations)
   const [file, setFile] = useState<File | null>(null);
   const [selectedBucket, setSelectedBucket] = useState<MainBucketId>('biz-op');
   const [uploading, setUploading] = useState(false);
@@ -106,7 +152,7 @@ export const UploadForm = ({ onClose, onUploadComplete, bucketCounts }: UploadFo
         console.log('Processing CSV file...');
         const text = await file.text();
         console.log('File content length:', text.length);
-        console.log('First 200 characters:', text.substring(0, 200));
+        console.log('First 500 characters:', text.substring(0, 500));
         
         const contacts = parseCSV(text);
         
@@ -114,7 +160,7 @@ export const UploadForm = ({ onClose, onUploadComplete, bucketCounts }: UploadFo
           throw new Error("No valid contacts found in CSV file. Please ensure your CSV has an 'Email' column with valid email addresses.");
         }
 
-        console.log('Parsed contacts with summit history:', contacts.map(c => ({ 
+        console.log('Parsed contacts with summit history sample:', contacts.slice(0, 3).map(c => ({ 
           email: c.email, 
           summitHistoryCount: c.summit_history.length,
           summitHistory: c.summit_history 
@@ -128,7 +174,7 @@ export const UploadForm = ({ onClose, onUploadComplete, bucketCounts }: UploadFo
         
         toast({
           title: "CSV upload successful",
-          description: `${contacts.length} contacts have been processed and added to the ${selectedBucket} bucket.`,
+          description: `${contacts.length} contacts have been processed and added to the ${selectedBucket} bucket with their complete tag history.`,
         });
       }
       
