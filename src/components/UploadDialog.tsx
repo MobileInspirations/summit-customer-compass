@@ -12,10 +12,22 @@ import { UploadForm } from "./UploadDialog/UploadForm";
 interface UploadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onUploadComplete?: () => void;
 }
 
-export const UploadDialog = ({ open, onOpenChange }: UploadDialogProps) => {
+export const UploadDialog = ({ open, onOpenChange, onUploadComplete }: UploadDialogProps) => {
   const { data: bucketCounts = {} } = useBucketCounts();
+
+  const handleClose = () => {
+    onOpenChange(false);
+  };
+
+  const handleUploadComplete = () => {
+    if (onUploadComplete) {
+      onUploadComplete();
+    }
+    handleClose();
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -28,7 +40,8 @@ export const UploadDialog = ({ open, onOpenChange }: UploadDialogProps) => {
         </DialogHeader>
 
         <UploadForm 
-          onClose={() => onOpenChange(false)}
+          onClose={handleClose}
+          onUploadComplete={handleUploadComplete}
           bucketCounts={bucketCounts}
         />
       </DialogContent>

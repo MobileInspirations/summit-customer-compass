@@ -30,6 +30,7 @@ interface DialogsContainerProps {
     handleAICategorizeAll: (contactLimit?: number) => void;
     handleContactLimitCategorization: (contactLimit?: number) => void;
   };
+  onUploadComplete: () => void;
 }
 
 export const DialogsContainer = ({
@@ -38,13 +39,15 @@ export const DialogsContainer = ({
   allCategories,
   exportState,
   categorizationState,
-  categorizationHandlers
+  categorizationHandlers,
+  onUploadComplete
 }: DialogsContainerProps) => {
   return (
     <>
       <UploadDialog 
         open={dialogState.showUploadDialog} 
-        onOpenChange={dialogState.setShowUploadDialog} 
+        onOpenChange={dialogState.setShowUploadDialog}
+        onUploadComplete={onUploadComplete}
       />
       <ExportDialog 
         open={dialogState.showExportDialog} 
