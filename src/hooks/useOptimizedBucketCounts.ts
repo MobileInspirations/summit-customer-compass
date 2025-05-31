@@ -8,26 +8,19 @@ interface BucketCountResult {
   count: number;
 }
 
-type BucketKey = 'biz-op' | 'health' | 'survivalist' | 'cannot-place';
-
-// Type guard to check if a string is a valid bucket key
-const isBucketKey = (key: string): key is BucketKey => {
-  return ['biz-op', 'health', 'survivalist', 'cannot-place'].includes(key);
-};
-
 export const useOptimizedBucketCounts = () => {
   return useQuery({
     queryKey: ["optimized-bucket-counts"],
-    queryFn: async (): Promise<Record<BucketKey, number>> => {
+    queryFn: async () => {
       console.log('=== Starting optimized bucket counts calculation ===');
       
-      // Initialize bucket counts with explicit typing
-      const bucketCounts = {
+      // Initialize with explicit object
+      const result = {
         'biz-op': 0,
         'health': 0,
         'survivalist': 0,
         'cannot-place': 0
-      } as Record<BucketKey, number>;
+      };
 
       // Get total count first for verification
       const { count: totalCount, error: countError } = await supabase
@@ -45,25 +38,21 @@ export const useOptimizedBucketCounts = () => {
       const { data: rpcData, error: rpcError } = await supabase
         .rpc('get_bucket_counts');
 
-      if (!rpcError && rpcData) {
-        // Process RPC results with explicit typing
+      if (!rpcError && rpcData && Array.isArray(rpcData)) {
         console.log('Using RPC function for bucket counts');
         
-        // Type the RPC data properly
-        const bucketStats = rpcData as BucketCountResult[];
-        
-        if (Array.isArray(bucketStats)) {
-          for (const stat of bucketStats) {
-            if (stat && typeof stat.bucket === 'string' && typeof stat.count === 'number') {
-              if (isBucketKey(stat.bucket)) {
-                bucketCounts[stat.bucket] = stat.count;
-              }
-            }
+        rpcData.forEach((item: any) => {
+          if (item && item.bucket && typeof item.count === 'number') {
+            const bucket = item.bucket.toString();
+            if (bucket === 'biz-op') result['biz-op'] = item.count;
+            else if (bucket === 'health') result['health'] = item.count;
+            else if (bucket === 'survivalist') result['survivalist'] = item.count;
+            else if (bucket === 'cannot-place') result['cannot-place'] = item.count;
           }
-        }
+        });
 
-        console.log('RPC bucket counts:', bucketCounts);
-        return bucketCounts;
+        console.log('RPC bucket counts:', result);
+        return result;
       }
 
       // Fallback: Manual counting
@@ -116,23 +105,23 @@ export const useOptimizedBucketCounts = () => {
             normalizedBucket === 'business-operations' ||
             normalizedBucket === 'business_operations' ||
             normalizedBucket === 'businessoperations') {
-          bucketCounts['biz-op']++;
+          result['biz-op']++;
         } else if (normalizedBucket === 'health' || normalizedBucket === 'health and wellness') {
-          bucketCounts['health']++;
+          result['health']++;
         } else if (normalizedBucket === 'survivalist' || normalizedBucket === 'survival' || normalizedBucket === 'emergency preparedness') {
-          bucketCounts['survivalist']++;
+          result['survivalist']++;
         } else if (normalizedBucket === 'cannot-place' || normalizedBucket === 'cannot place' || normalizedBucket === 'unassigned') {
-          bucketCounts['cannot-place']++;
+          result['cannot-place']++;
         } else {
           console.log('Unknown bucket value:', bucket, '- assigning to biz-op');
-          bucketCounts['biz-op']++;
+          result['biz-op']++;
         }
       }
 
-      console.log('Final optimized bucket counts:', bucketCounts);
-      console.log('Total counted contacts:', Object.values(bucketCounts).reduce((sum, count) => sum + count, 0));
+      console.log('Final optimized bucket counts:', result);
+      console.log('Total counted contacts:', Object.values(result).reduce((sum, count) => sum + count, 0));
       
-      return bucketCounts;
+      return result;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
