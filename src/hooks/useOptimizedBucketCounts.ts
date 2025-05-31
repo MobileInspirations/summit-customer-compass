@@ -30,7 +30,7 @@ export const useOptimizedBucketCounts = () => {
 
       // Use database aggregation with proper typing
       const { data: bucketStats, error } = await supabase
-        .rpc('get_bucket_counts') as { data: BucketCountResult[] | null; error: any };
+        .rpc('get_bucket_counts');
 
       if (error) {
         console.warn("RPC function not available, falling back to manual counting:", error);
@@ -132,6 +132,6 @@ export const useOptimizedBucketCounts = () => {
       return bucketCounts;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes,
   });
 };
