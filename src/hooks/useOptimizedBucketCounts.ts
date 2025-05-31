@@ -13,7 +13,7 @@ type BucketKey = 'biz-op' | 'health' | 'survivalist' | 'cannot-place';
 export const useOptimizedBucketCounts = () => {
   return useQuery({
     queryKey: ["optimized-bucket-counts"],
-    queryFn: async () => {
+    queryFn: async (): Promise<Record<BucketKey, number>> => {
       console.log('=== Starting optimized bucket counts calculation ===');
       
       // Get total count first for verification
@@ -30,7 +30,7 @@ export const useOptimizedBucketCounts = () => {
 
       // Use database aggregation with proper typing
       const { data: bucketStats, error } = await supabase
-        .rpc('get_bucket_counts');
+        .rpc('get_bucket_counts') as { data: BucketCountResult[] | null; error: any };
 
       if (error) {
         console.warn("RPC function not available, falling back to manual counting:", error);
@@ -132,6 +132,6 @@ export const useOptimizedBucketCounts = () => {
       return bucketCounts;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes,
+    gcTime: 10 * 60 * 1000, // 10 minutes
   });
 };
