@@ -38,10 +38,15 @@ export const exportContactsByCategory = async (
       .from("contact_categories")
       .select(`
         contacts!inner(
+          id,
           full_name,
           email,
           company,
-          created_at
+          engagement_level,
+          tags,
+          summit_history,
+          created_at,
+          updated_at
         ),
         customer_categories!inner(
           name
@@ -77,11 +82,15 @@ export const exportContactsByCategory = async (
       console.log(`Email cleaning complete: ${processedContacts.length}/${contactsInCategory.length} contacts retained`);
     }
 
-    // Create CSV content for contacts in this batch
-    const csvHeaders = "Name,Email,Company,Created Date,Category\n";
-    const csvRows = processedContacts.map(item => 
-      `"${item.contacts.full_name || ''}","${item.contacts.email}","${item.contacts.company || ''}","${item.contacts.created_at}","${item.customer_categories.name}"`
-    ).join("\n");
+    // Create CSV content for contacts in this batch with all available data
+    const csvHeaders = "ID,Name,Email,Company,Engagement Level,Tags,Summit History,Category,Created Date,Updated Date\n";
+    const csvRows = processedContacts.map(item => {
+      const contact = item.contacts;
+      const tagsString = contact.tags ? contact.tags.join(';') : '';
+      const summitHistoryString = contact.summit_history ? contact.summit_history.join(';') : '';
+      
+      return `"${contact.id}","${contact.full_name || ''}","${contact.email}","${contact.company || ''}","${contact.engagement_level || ''}","${tagsString}","${summitHistoryString}","${item.customer_categories.name}","${contact.created_at}","${contact.updated_at}"`;
+    }).join("\n");
     
     const csvContent = csvHeaders + csvRows;
     

@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useContacts } from "@/hooks/useContacts";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -22,10 +21,13 @@ const ContactsTable = () => {
   );
 
   const handleExportContacts = () => {
-    const csvHeaders = "Name,Email,Company,Engagement Level,Tags,Summit History,Created Date\n";
-    const csvRows = filteredContacts.map(contact => 
-      `"${contact.full_name || ''}","${contact.email}","${contact.company || ''}","${contact.engagement_level || ''}","${contact.tags?.join(';') || ''}","${contact.summit_history?.join(';') || ''}","${contact.created_at}"`
-    ).join("\n");
+    const csvHeaders = "ID,Name,Email,Company,Engagement Level,Tags,Summit History,Created Date,Updated Date\n";
+    const csvRows = filteredContacts.map(contact => {
+      const tagsString = contact.tags ? contact.tags.join(';') : '';
+      const summitHistoryString = contact.summit_history ? contact.summit_history.join(';') : '';
+      
+      return `"${contact.id}","${contact.full_name || ''}","${contact.email}","${contact.company || ''}","${contact.engagement_level || ''}","${tagsString}","${summitHistoryString}","${contact.created_at}","${contact.updated_at}"`;
+    }).join("\n");
     
     const csvContent = csvHeaders + csvRows;
     
