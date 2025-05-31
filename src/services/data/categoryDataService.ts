@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 export interface Category {
   id: string;
   name: string;
-  description?: string;
+  description: string;
   color: string;
   category_type: string;
   created_at: string;
@@ -45,7 +45,7 @@ export const fetchAllCategories = async (): Promise<Category[]> => {
         return {
           id: category.id,
           name: category.name,
-          description: category.description,
+          description: category.description || '',
           color: category.color,
           category_type: category.category_type,
           created_at: category.created_at,
@@ -57,7 +57,7 @@ export const fetchAllCategories = async (): Promise<Category[]> => {
       return {
         id: category.id,
         name: category.name,
-        description: category.description,
+        description: category.description || '',
         color: category.color,
         category_type: category.category_type,
         created_at: category.created_at,
