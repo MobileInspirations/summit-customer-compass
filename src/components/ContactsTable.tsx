@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useContacts } from "@/hooks/useContacts";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -16,17 +17,15 @@ const ContactsTable = () => {
   const filteredContacts = contacts.filter(contact => 
     contact.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     contact.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    contact.company?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    contact.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
+    contact.company?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleExportContacts = () => {
-    const csvHeaders = "ID,Name,Email,Company,Engagement Level,Tags,Summit History,Created Date,Updated Date\n";
+    const csvHeaders = "ID,Name,Email,Company,Engagement Level,Summit History,Main Bucket,Created Date,Updated Date\n";
     const csvRows = filteredContacts.map(contact => {
-      const tagsString = contact.tags ? contact.tags.join(';') : '';
       const summitHistoryString = contact.summit_history ? contact.summit_history.join(';') : '';
       
-      return `"${contact.id}","${contact.full_name || ''}","${contact.email}","${contact.company || ''}","${contact.engagement_level || ''}","${tagsString}","${summitHistoryString}","${contact.created_at}","${contact.updated_at}"`;
+      return `"${contact.id}","${contact.full_name || ''}","${contact.email}","${contact.company || ''}","${contact.engagement_level || ''}","${summitHistoryString}","${contact.main_bucket || ''}","${contact.created_at}","${contact.updated_at}"`;
     }).join("\n");
     
     const csvContent = csvHeaders + csvRows;
@@ -59,6 +58,24 @@ const ContactsTable = () => {
       case 'L': return 'Low';
       case 'U': return 'Unengaged';
       default: return 'Unknown';
+    }
+  };
+
+  const getMainBucketLabel = (bucket?: string) => {
+    switch (bucket) {
+      case 'biz-op': return 'Business Operations';
+      case 'health': return 'Health';
+      case 'survivalist': return 'Survivalist';
+      default: return 'Unknown';
+    }
+  };
+
+  const getMainBucketVariant = (bucket?: string) => {
+    switch (bucket) {
+      case 'biz-op': return 'default';
+      case 'health': return 'secondary';
+      case 'survivalist': return 'outline';
+      default: return 'outline';
     }
   };
 
@@ -121,7 +138,7 @@ const ContactsTable = () => {
                 <TableHead>Email</TableHead>
                 <TableHead>Company</TableHead>
                 <TableHead>Engagement</TableHead>
-                <TableHead>Tags</TableHead>
+                <TableHead>Main Bucket</TableHead>
                 <TableHead>Summit History</TableHead>
                 <TableHead>Created</TableHead>
               </TableRow>
@@ -151,22 +168,13 @@ const ContactsTable = () => {
                       )}
                     </TableCell>
                     <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {contact.tags && contact.tags.length > 0 ? (
-                          contact.tags.slice(0, 2).map((tag, index) => (
-                            <Badge key={index} variant="outline" className="text-xs">
-                              {tag}
-                            </Badge>
-                          ))
-                        ) : (
-                          <span className="text-gray-400">No tags</span>
-                        )}
-                        {contact.tags && contact.tags.length > 2 && (
-                          <Badge variant="outline" className="text-xs">
-                            +{contact.tags.length - 2}
-                          </Badge>
-                        )}
-                      </div>
+                      {contact.main_bucket ? (
+                        <Badge variant={getMainBucketVariant(contact.main_bucket)}>
+                          {getMainBucketLabel(contact.main_bucket)}
+                        </Badge>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       {contact.summit_history && contact.summit_history.length > 0 ? (

@@ -9,7 +9,6 @@ export interface ProcessedContact {
   company?: string;
   summit_history: string[];
   engagement_level: 'H' | 'L' | 'M' | 'U';
-  tags: string[];
   bucket: MainBucketId;
   folder_path: string[]; // Store the full folder path for additional context
 }

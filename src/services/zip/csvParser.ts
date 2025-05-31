@@ -1,91 +1,50 @@
 
-export const parseCSVLine = (line: string): string[] => {
-  const result: string[] = [];
-  let current = '';
-  let inQuotes = false;
-  
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
-    
-    if (char === '"') {
-      inQuotes = !inQuotes;
-    } else if (char === ',' && !inQuotes) {
-      result.push(current);
-      current = '';
-    } else {
-      current += char;
-    }
-  }
-  
-  result.push(current);
-  return result;
-};
-
-export const isValidEmail = (email: string): boolean => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-};
+import { type ProcessedContact } from "./csvProcessor";
+import { type MainBucketId } from "../bucketCategorizationService";
 
 export const parseCSVContent = (
-  content: string, 
-  summitName: string, 
+  csvContent: string,
+  summitName: string,
   engagementLevel: 'H' | 'L' | 'M' | 'U',
-  bucket: import("../bucketCategorizationService").MainBucketId,
+  bucket: MainBucketId,
   folderPath: string[]
-): import("./csvProcessor").ProcessedContact[] => {
+): ProcessedContact[] => {
   console.log(`Parsing CSV content for summit: ${summitName}, engagement: ${engagementLevel}, bucket: ${bucket}`);
   
-  const lines = content.split('\n').filter(line => line.trim());
-  console.log(`CSV has ${lines.length} lines`);
-  
+  const lines = csvContent.split('\n').filter(line => line.trim());
   if (lines.length <= 1) {
     console.log('No data rows found in CSV');
     return [];
   }
 
-  const contacts: import("./csvProcessor").ProcessedContact[] = [];
+  // Parse header to find column indices
+  const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/"/g, ''));
+  const emailIndex = headers.findIndex(h => h.includes('email'));
   
-  // Create comprehensive tags from folder structure and metadata
-  const folderTags = folderPath.filter(folder => folder.trim() !== '');
-  const engagementTag = `${engagementLevel}-Engagement`;
-  const bucketTag = `${bucket}-bucket`;
-  
-  // Skip header row and process data
+  if (emailIndex === -1) {
+    console.error('No email column found in CSV headers:', headers);
+    return [];
+  }
+
+  const nameIndex = headers.findIndex(h => h.includes('name') || h.includes('first'));
+  const companyIndex = headers.findIndex(h => h.includes('company') || h.includes('organization'));
+
+  const contacts: ProcessedContact[] = [];
+
   for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-
-    try {
-      // Parse CSV line (assuming email is first column, name second, company third)
-      const columns = parseCSVLine(line);
-      if (columns.length === 0 || !columns[0]) continue;
-
-      const email = columns[0].trim();
-      if (!email || !isValidEmail(email)) {
-        console.log(`Invalid email found: ${email}`);
-        continue;
-      }
-
-      // Comprehensive tagging from folder structure and metadata
-      const allTags = [
-        summitName,
-        engagementTag,
-        bucketTag,
-        ...folderTags
-      ].filter(tag => tag && tag.trim() !== '');
-
+    const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
+    const email = values[emailIndex]?.trim();
+    
+    if (email && email.includes('@')) {
       contacts.push({
         email,
-        name: columns[1]?.trim() || undefined,
-        company: columns[2]?.trim() || undefined,
+        name: nameIndex !== -1 ? values[nameIndex] : undefined,
+        company: companyIndex !== -1 ? values[companyIndex] : undefined,
         summit_history: [summitName],
         engagement_level: engagementLevel,
-        tags: allTags,
         bucket,
         folder_path: folderPath
       });
-    } catch (error) {
-      console.error(`Error parsing line ${i}: ${line}`, error);
     }
   }
 

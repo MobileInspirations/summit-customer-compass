@@ -20,7 +20,6 @@ export const upsertContactBatch = async (contacts: ProcessedContact[]): Promise<
     if (existingContact) {
       // Merge with existing data
       const existingSummitHistory = existingContact.summit_history || [];
-      const existingTags = existingContact.tags || [];
       
       return {
         email: contact.email,
@@ -28,7 +27,7 @@ export const upsertContactBatch = async (contacts: ProcessedContact[]): Promise<
         company: contact.company || existingContact.company,
         summit_history: [...new Set([...existingSummitHistory, ...contact.summit_history])],
         engagement_level: contact.engagement_level || existingContact.engagement_level,
-        tags: [...new Set([...existingTags, ...contact.tags])]
+        main_bucket: contact.bucket // Update main bucket
       };
     } else {
       // New contact
@@ -38,7 +37,7 @@ export const upsertContactBatch = async (contacts: ProcessedContact[]): Promise<
         company: contact.company || null,
         summit_history: contact.summit_history,
         engagement_level: contact.engagement_level,
-        tags: contact.tags
+        main_bucket: contact.bucket
       };
     }
   });
@@ -114,9 +113,8 @@ export const upsertContactWithProperMerging = async (contact: ProcessedContact):
     // Merge with existing data - UPDATE scenario
     console.log(`Updating existing contact: ${contact.email}`);
     
-    // Merge summit history and tags intelligently
+    // Merge summit history intelligently
     const existingSummitHistory = existingContact.summit_history || [];
-    const existingTags = existingContact.tags || [];
     
     finalContact = {
       email: contact.email,
@@ -124,16 +122,14 @@ export const upsertContactWithProperMerging = async (contact: ProcessedContact):
       company: contact.company || existingContact.company,
       summit_history: [...new Set([...existingSummitHistory, ...contact.summit_history])],
       engagement_level: contact.engagement_level || existingContact.engagement_level,
-      tags: [...new Set([...existingTags, ...contact.tags])]
+      main_bucket: contact.bucket
     };
     
     console.log(`Merging data for ${contact.email}:`, {
       existingSummitHistory: existingSummitHistory.length,
       newSummitHistory: contact.summit_history.length,
       finalSummitHistory: finalContact.summit_history.length,
-      existingTags: existingTags.length,
-      newTags: contact.tags.length,
-      finalTags: finalContact.tags.length
+      mainBucket: finalContact.main_bucket
     });
   } else {
     // New contact - CREATE scenario
@@ -144,13 +140,13 @@ export const upsertContactWithProperMerging = async (contact: ProcessedContact):
       company: contact.company || null,
       summit_history: contact.summit_history,
       engagement_level: contact.engagement_level,
-      tags: contact.tags
+      main_bucket: contact.bucket
     };
     
     console.log(`New contact data for ${contact.email}:`, {
       summitHistory: finalContact.summit_history.length,
-      tags: finalContact.tags.length,
-      engagementLevel: finalContact.engagement_level
+      engagementLevel: finalContact.engagement_level,
+      mainBucket: finalContact.main_bucket
     });
   }
 

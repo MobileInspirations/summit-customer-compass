@@ -53,8 +53,8 @@ export type Database = {
           engagement_level: string | null
           full_name: string | null
           id: string
+          main_bucket: string
           summit_history: string[] | null
-          tags: string[] | null
           updated_at: string
         }
         Insert: {
@@ -64,8 +64,8 @@ export type Database = {
           engagement_level?: string | null
           full_name?: string | null
           id?: string
+          main_bucket: string
           summit_history?: string[] | null
-          tags?: string[] | null
           updated_at?: string
         }
         Update: {
@@ -75,8 +75,8 @@ export type Database = {
           engagement_level?: string | null
           full_name?: string | null
           id?: string
+          main_bucket?: string
           summit_history?: string[] | null
-          tags?: string[] | null
           updated_at?: string
         }
         Relationships: []

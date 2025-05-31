@@ -1,5 +1,5 @@
 
-import { type MainBucketId } from "../bucketCategorizationService";
+import { type MainBucketId, SUMMIT_MAPPING } from "../bucketCategorizationService";
 
 export interface BucketMappingResult {
   bucket: MainBucketId;
@@ -44,6 +44,13 @@ export const mapFolderToBucket = (pathParts: string[], filename: string): Bucket
     } else {
       summitName = extractSummitFromFilename(filename);
     }
+  }
+
+  // Check if summit name maps to a specific bucket based on summit mapping
+  const mappedBucket = SUMMIT_MAPPING[summitName as keyof typeof SUMMIT_MAPPING];
+  if (mappedBucket) {
+    bucket = mappedBucket;
+    console.log(`Summit ${summitName} mapped to ${bucket} bucket`);
   }
 
   return { bucket, summitName };

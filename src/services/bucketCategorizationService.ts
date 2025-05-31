@@ -1,136 +1,86 @@
 
 import { supabase } from "@/integrations/supabase/client";
 
-// Main bucket categories
-export const MAIN_BUCKETS = {
+export type MainBucketId = 'biz-op' | 'health' | 'survivalist';
+
+export interface MainBucket {
+  id: MainBucketId;
+  name: string;
+  description: string;
+}
+
+export const MAIN_BUCKETS: Record<MainBucketId, MainBucket> = {
   'biz-op': {
     id: 'biz-op',
     name: 'Business Operations',
-    description: 'Business-focused contacts and operations',
-    category_type: 'customer'
+    description: 'Business and entrepreneurship focused contacts'
   },
   'health': {
     id: 'health',
     name: 'Health',
-    description: 'Health and wellness related contacts',
-    category_type: 'customer'
+    description: 'Health and wellness focused contacts'
   },
   'survivalist': {
     id: 'survivalist',
     name: 'Survivalist',
-    description: 'Emergency preparedness and survival contacts',
-    category_type: 'customer'
-  },
-  'cannot-place': {
-    id: 'cannot-place',
-    name: 'Cannot Place',
-    description: 'Contacts that do not match any specific category',
-    category_type: 'customer'
+    description: 'Survivalist and preparedness focused contacts'
   }
+};
+
+// Summit mapping based on the provided structure
+export const SUMMIT_MAPPING = {
+  // Biz Summits
+  'AI Mastery': 'biz-op',
+  'Copywriting Summit': 'biz-op',
+  'EPIK SUMMIT': 'biz-op',
+  'FUTURE OF CRYPTO': 'biz-op',
+  'GOLD SUMMIT': 'biz-op',
+  'Health Coaching Summit': 'biz-op',
+  'Leadership Summit': 'biz-op',
+  'Privacy Summit': 'biz-op',
+  'Publicity Summit': 'biz-op',
+  'Summit talks': 'biz-op',
+
+  // Health Summits
+  '360 Health': 'health',
+  '7 Figure Chiropractor': 'health',
+  'Autoimmune Supertools': 'health',
+  'Beyond The Cancer': 'health',
+  'Biohacker LIVE': 'health',
+  'Brain Regeneration Summit': 'health',
+  'Breathwork Blueprint': 'health',
+  'Caregiver Conference': 'health',
+  'EMF Hazards': 'health',
+  'ENERGY BLUEPRINT': 'health',
+  'GOT MOLD': 'health',
+  'Green Plant Summit': 'health',
+  'GUT HEALTH SUMMIT': 'health',
+  'Happy Vagine': 'health',
+  'Healthy Aging Summit': 'health',
+  'Healthy Vibrant Women': 'health',
+  'Holistic Sleep Summit': 'health',
+  'Inspired Mom': 'health',
+  'Keto Summit': 'health',
+  'Kids Brain Summit': 'health',
+  'Metaphysically Fit': 'health',
+  'Optimal Performance Summit': 'health',
+  'Pain Solution Summit': 'health',
+  'Pandemic Recovery': 'health',
+  'Reverse Autoimmune Disease Summit': 'health',
+  'Science of Slimming Summit': 'health',
+  'Self-love Summit': 'health',
+  'Speakerfest': 'health',
+  'Thrive State': 'health',
+  'Trauma Recovery Summit': 'health',
+  'Women\'s Balance Summit': 'health',
+  'Yoga Summit': 'health',
+
+  // Survivalist Summit
+  'Common Sense (Survivalist)': 'survivalist'
 } as const;
 
-export type MainBucketId = keyof typeof MAIN_BUCKETS;
-
 export const ensureMainBucketsExist = async (): Promise<void> => {
-  console.log('Ensuring main buckets exist...');
-  
-  for (const bucket of Object.values(MAIN_BUCKETS)) {
-    const { data: existing, error: checkError } = await supabase
-      .from('customer_categories')
-      .select('id')
-      .eq('name', bucket.name)
-      .single();
-
-    if (checkError && checkError.code !== 'PGRST116') {
-      console.error('Error checking for bucket:', bucket.name, checkError);
-      continue;
-    }
-
-    if (!existing) {
-      const { error: insertError } = await supabase
-        .from('customer_categories')
-        .insert({
-          name: bucket.name,
-          description: bucket.description,
-          category_type: bucket.category_type,
-          color: getBucketColor(bucket.id)
-        });
-
-      if (insertError) {
-        console.error('Error creating bucket:', bucket.name, insertError);
-      } else {
-        console.log('Created main bucket:', bucket.name);
-      }
-    }
-  }
-};
-
-export const assignContactsToBucket = async (
-  contactEmails: string[],
-  bucketId: MainBucketId
-): Promise<void> => {
-  if (!contactEmails || contactEmails.length === 0) return;
-
-  console.log(`Assigning ${contactEmails.length} contacts to bucket: ${bucketId}`);
-
-  // First, get the bucket category ID
-  const bucket = MAIN_BUCKETS[bucketId];
-  const { data: category, error: categoryError } = await supabase
-    .from('customer_categories')
-    .select('id')
-    .eq('name', bucket.name)
-    .single();
-
-  if (categoryError || !category) {
-    console.error('Error finding bucket category:', categoryError);
-    throw new Error(`Could not find bucket: ${bucket.name}`);
-  }
-
-  // Get contact IDs for the emails
-  const { data: contacts, error: contactsError } = await supabase
-    .from('contacts')
-    .select('id')
-    .in('email', contactEmails);
-
-  if (contactsError) {
-    console.error('Error fetching contact IDs:', contactsError);
-    throw contactsError;
-  }
-
-  if (contacts && contacts.length > 0) {
-    // Create contact-category relationships
-    const contactCategoryRecords = contacts.map(contact => ({
-      contact_id: contact.id,
-      category_id: category.id
-    }));
-
-    const { error: assignError } = await supabase
-      .from('contact_categories')
-      .upsert(contactCategoryRecords, { 
-        onConflict: 'contact_id,category_id',
-        ignoreDuplicates: true 
-      });
-
-    if (assignError) {
-      console.error('Error assigning contacts to bucket:', assignError);
-      throw assignError;
-    }
-
-    console.log(`Successfully assigned ${contacts.length} contacts to ${bucket.name}`);
-  }
-};
-
-const getBucketColor = (bucketId: MainBucketId): string => {
-  switch (bucketId) {
-    case 'biz-op':
-      return 'bg-blue-500';
-    case 'health':
-      return 'bg-green-500';
-    case 'survivalist':
-      return 'bg-orange-500';
-    case 'cannot-place':
-      return 'bg-gray-500';
-    default:
-      return 'bg-gray-500';
-  }
+  // Since main buckets are now stored directly in the contacts table,
+  // we don't need to create separate bucket records
+  console.log('Main buckets are now handled as contact column values');
 };
