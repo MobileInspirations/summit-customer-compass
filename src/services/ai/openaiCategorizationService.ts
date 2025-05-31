@@ -14,12 +14,29 @@ const PERSONALITY_BUCKETS = {
   "Women's Health & Community": "Topics specific to women's physiological and psychological health, empowerment, and community building for women."
 };
 
-// Initialize OpenAI client for browser use
-let openaiApiKey: string | null = null;
-
-export const initializeOpenAI = (apiKey: string) => {
-  openaiApiKey = apiKey;
-  console.log('OpenAI API key initialized for AI categorization');
+// Get API key from Supabase secrets
+const getOpenAIApiKey = async (): Promise<string> => {
+  const { supabase } = await import("@/integrations/supabase/client");
+  
+  try {
+    const { data, error } = await supabase.functions.invoke('get-secret', {
+      body: { name: 'OPENAI_API_KEY' }
+    });
+    
+    if (error) {
+      console.error('Error getting OpenAI API key from Supabase:', error);
+      throw new Error('Failed to retrieve OpenAI API key from secure storage');
+    }
+    
+    if (!data?.value) {
+      throw new Error('OpenAI API key not found in secure storage');
+    }
+    
+    return data.value;
+  } catch (error) {
+    console.error('Error accessing OpenAI API key:', error);
+    throw new Error('OpenAI API key not available. Please check your Supabase configuration.');
+  }
 };
 
 export const categorizeContactWithAI = async (
@@ -30,9 +47,14 @@ export const categorizeContactWithAI = async (
   console.log('Contact tags:', contactTags);
   console.log('Summit history:', summitHistory);
   
-  if (!openaiApiKey) {
-    console.error('OpenAI API key not provided');
-    throw new Error('OpenAI API key not provided');
+  // Get API key from Supabase secrets
+  let openaiApiKey: string;
+  try {
+    openaiApiKey = await getOpenAIApiKey();
+    console.log('OpenAI API key retrieved from Supabase secrets');
+  } catch (error) {
+    console.error('Failed to get OpenAI API key:', error);
+    throw error;
   }
 
   if (!contactTags.length && !summitHistory.length) {

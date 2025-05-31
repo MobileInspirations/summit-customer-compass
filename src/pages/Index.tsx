@@ -26,7 +26,6 @@ const Index = () => {
   const [selectedBucket, setSelectedBucket] = useState<MainBucketId>('biz-op');
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
-  const [showAIDialog, setShowAIDialog] = useState(false);
   const [isCategorizing, setIsCategorizing] = useState(false);
   const [isSorting, setIsSorting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -155,8 +154,8 @@ const Index = () => {
     }
   };
 
-  // AI-based categorization (REQUIRES API KEY)
-  const handleAICategorizeAll = async (apiKey: string, contactLimit?: number) => {
+  // AI-based categorization (USES STORED API KEY FROM SUPABASE)
+  const handleAICategorizeAll = async () => {
     setIsCategorizing(true);
     setCategorizationProgress({
       progress: 0,
@@ -170,16 +169,15 @@ const Index = () => {
     cancellationTokenRef.current = new CancellationToken();
 
     try {
-      // Call categorizeContacts with useAI = true and the provided API key
+      // Call categorizeContacts with useAI = true (API key will be retrieved from Supabase)
       await categorizeContacts(
         undefined, // contactIds
         (progress) => {
           setCategorizationProgress(progress);
         }, 
         true, // useAI = true for AI categorization
-        apiKey, // API key provided by user
-        cancellationTokenRef.current, 
-        contactLimit
+        undefined, // API key will be retrieved from Supabase secrets
+        cancellationTokenRef.current
       );
       queryClient.invalidateQueries({ queryKey: ["categories"] });
       toast({
@@ -194,12 +192,11 @@ const Index = () => {
       console.error('AI Categorization error:', error);
       toast({
         title: "AI Categorization failed",
-        description: "Please check your API key and try again.",
+        description: "Please check your API key configuration in Supabase and try again.",
         variant: "destructive",
       });
     } finally {
       setIsCategorizing(false);
-      setShowAIDialog(false);
       cancellationTokenRef.current = null;
       setTimeout(() => {
         setCategorizationProgress({
@@ -326,7 +323,7 @@ const Index = () => {
         onSortContacts={handleSortContacts}
         onExportAllTags={handleExportAllTags}
         onCategorizeAll={handleCategorizeAll}
-        onAICategorizeAll={() => setShowAIDialog(true)}
+        onAICategorizeAll={handleAICategorizeAll}
         onExport={handleExport}
         onSignOut={handleSignOut}
         selectedCategoriesCount={selectedCategories.length}
@@ -376,9 +373,9 @@ const Index = () => {
         onEmailCleaningProgress={handleEmailCleaningProgress}
       />
       <AICategorizationDialog
-        open={showAIDialog}
-        onOpenChange={setShowAIDialog}
-        onCategorize={handleAICategorizeAll}
+        open={false}
+        onOpenChange={() => {}}
+        onCategorize={() => {}}
       />
       <CategorizationProgress
         isVisible={isCategorizing}
