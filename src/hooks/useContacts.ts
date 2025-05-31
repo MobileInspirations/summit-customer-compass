@@ -23,9 +23,48 @@ export const useContacts = () => {
         main_bucket: c.main_bucket
       })));
 
-      return data;
+      // Normalize main_bucket values for consistency
+      const normalizedData = data?.map(contact => ({
+        ...contact,
+        main_bucket: normalizeBucketName(contact.main_bucket)
+      }));
+
+      return normalizedData;
     },
   });
+};
+
+// Helper function to normalize bucket names
+const normalizeBucketName = (bucketName: string | null): string => {
+  if (!bucketName) return 'biz-op'; // Default to biz-op for null values
+  
+  const normalized = bucketName.toLowerCase().trim();
+  
+  // Normalize all business operations variants
+  if (normalized === 'business operations' || 
+      normalized === 'business-operations' ||
+      normalized === 'business_operations' ||
+      normalized === 'businessoperations' ||
+      normalized === 'biz') {
+    return 'biz-op';
+  }
+  
+  // Normalize health variants
+  if (normalized === 'health and wellness') {
+    return 'health';
+  }
+  
+  // Normalize survivalist variants
+  if (normalized === 'survival' || normalized === 'emergency preparedness') {
+    return 'survivalist';
+  }
+  
+  // Normalize cannot place variants
+  if (normalized === 'cannot place' || normalized === 'unassigned') {
+    return 'cannot-place';
+  }
+  
+  return normalized; // Return as-is if already normalized
 };
 
 export const useContactsCount = () => {

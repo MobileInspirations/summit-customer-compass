@@ -21,7 +21,7 @@ export const useBucketCounts = () => {
       console.log('Total contacts fetched for bucket counting:', allContacts?.length);
       console.log('Sample contact main_bucket values:', allContacts?.slice(0, 10).map(c => c.main_bucket));
 
-      // Count contacts by main_bucket with proper normalization
+      // Count contacts by main_bucket with comprehensive normalization
       const bucketCounts: Record<string, number> = {
         'biz-op': 0,
         'health': 0,
@@ -30,21 +30,26 @@ export const useBucketCounts = () => {
       };
 
       allContacts?.forEach(contact => {
-        const bucket = contact.main_bucket;
+        const bucket = contact.main_bucket?.toLowerCase() || '';
         console.log('Processing contact with bucket:', bucket);
         
-        // Normalize all business operations variants to 'biz-op'
-        if (bucket === 'biz-op' || bucket === 'biz' || bucket === 'Business Operations' || bucket === 'business operations') {
+        // Comprehensive normalization for all business operations variants
+        if (bucket === 'biz-op' || 
+            bucket === 'biz' || 
+            bucket === 'business operations' || 
+            bucket === 'business-operations' ||
+            bucket === 'business_operations' ||
+            bucket === 'businessoperations') {
           bucketCounts['biz-op']++;
-        } else if (bucket === 'health' || bucket === 'Health') {
+        } else if (bucket === 'health' || bucket === 'health and wellness') {
           bucketCounts['health']++;
-        } else if (bucket === 'survivalist' || bucket === 'Survivalist') {
+        } else if (bucket === 'survivalist' || bucket === 'survival' || bucket === 'emergency preparedness') {
           bucketCounts['survivalist']++;
-        } else if (bucket === 'cannot-place' || bucket === 'Cannot Place') {
+        } else if (bucket === 'cannot-place' || bucket === 'cannot place' || bucket === 'unassigned') {
           bucketCounts['cannot-place']++;
-        } else {
-          console.warn('Unknown bucket value found:', bucket);
-          // Default unknown buckets to biz-op since most uploads are business operations
+        } else if (bucket !== '') {
+          // For any unknown non-empty bucket, log it and count as biz-op since most uploads are business operations
+          console.warn('Unknown bucket value found:', bucket, '- assigning to biz-op');
           bucketCounts['biz-op']++;
         }
       });
