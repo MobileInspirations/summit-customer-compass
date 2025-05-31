@@ -1,153 +1,141 @@
 
 import { useState } from "react";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
-import { Upload, FileArchive } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 import { processZipUpload } from "@/services/zipUploadService";
-import { useToast } from "@/components/ui/use-toast";
+import { UploadProgress } from "@/components/UploadProgress";
+import { FileUploadInput } from "@/components/FileUploadInput";
+import { BucketSelector } from "@/components/BucketSelector";
+import { useBucketCounts } from "@/hooks/useBucketCounts";
+import type { MainBucketId } from "@/services/bucketCategorizationService";
 
 interface ZipUploadDialogProps {
-  onUploadComplete?: () => void;
+  onUploadComplete: () => void;
 }
 
 const ZipUploadDialog = ({ onUploadComplete }: ZipUploadDialogProps) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [selectedBucket, setSelectedBucket] = useState<MainBucketId>('biz-op');
+  const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { data: bucketCounts = {} } = useBucketCounts();
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file && file.name.endsWith('.zip')) {
-      setSelectedFile(file);
-    } else {
+  const handleFileChange = (selectedFile: File | null) => {
+    if (!selectedFile) {
+      toast({
+        title: "Invalid file",
+        description: "Please select a ZIP file.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (!selectedFile.name.endsWith('.zip') && selectedFile.type !== 'application/zip') {
       toast({
         title: "Invalid file type",
-        description: "Please select a ZIP file",
-        variant: "destructive"
+        description: "Please select a ZIP file.",
+        variant: "destructive",
       });
-      event.target.value = '';
+      return;
     }
+    
+    setFile(selectedFile);
   };
 
   const handleUpload = async () => {
-    if (!selectedFile) return;
+    if (!file) return;
 
-    setIsUploading(true);
+    setUploading(true);
     setProgress(0);
 
     try {
-      await processZipUpload(selectedFile, setProgress);
+      await processZipUpload(file, selectedBucket, setProgress);
       
       toast({
-        title: "Upload successful",
-        description: "Contacts have been processed and categorized",
+        title: "ZIP upload successful",
+        description: `All contacts from the ZIP file have been added to the ${selectedBucket} bucket.`,
       });
+      
+      // Invalidate queries to refresh the UI
+      queryClient.invalidateQueries({ queryKey: ["contacts"] });
+      queryClient.invalidateQueries({ queryKey: ["contacts-count"] });
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+      
+      onUploadComplete();
+      
+      // Reset state and close dialog
+      setTimeout(() => {
+        setFile(null);
+        setUploading(false);
+        setProgress(0);
+        setOpen(false);
+      }, 1000);
 
-      setIsOpen(false);
-      setSelectedFile(null);
-      setProgress(0);
-      onUploadComplete?.();
     } catch (error) {
-      console.error('Upload failed:', error);
+      console.error('ZIP upload error:', error);
       toast({
         title: "Upload failed",
-        description: error instanceof Error ? error.message : "An error occurred during upload",
-        variant: "destructive"
+        description: error instanceof Error ? error.message : "Please try again or contact support.",
+        variant: "destructive",
       });
-    } finally {
-      setIsUploading(false);
+      setUploading(false);
+      setProgress(0);
     }
   };
 
-  const resetDialog = () => {
-    setSelectedFile(null);
-    setProgress(0);
-    setIsUploading(false);
-  };
-
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => {
-      setIsOpen(open);
-      if (!open) resetDialog();
-    }}>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="gap-2">
-          <FileArchive className="w-4 h-4" />
-          Upload ZIP File
+        <Button>
+          <Upload className="w-4 h-4 mr-2" />
+          Upload ZIP
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Upload Structured ZIP File</DialogTitle>
-          <DialogDescription>
-            Upload a ZIP file containing contacts organized by buckets (Biz/Health/Survivalist), 
-            summits, and engagement levels (H/L/M/U).
-          </DialogDescription>
+          <DialogTitle>Upload ZIP File</DialogTitle>
         </DialogHeader>
-
+        
         <div className="space-y-4">
-          <div className="space-y-2">
-            <label htmlFor="zip-file" className="text-sm font-medium">
-              Select ZIP File
-            </label>
-            <Input
-              id="zip-file"
-              type="file"
-              accept=".zip"
-              onChange={handleFileSelect}
-              disabled={isUploading}
+          <FileUploadInput
+            file={file}
+            onFileChange={handleFileChange}
+            disabled={uploading}
+            acceptedTypes="zip"
+          />
+
+          {file && !uploading && (
+            <BucketSelector
+              selectedBucket={selectedBucket}
+              onBucketChange={(bucket) => setSelectedBucket(bucket as MainBucketId)}
+              bucketCounts={bucketCounts}
             />
-          </div>
-
-          {selectedFile && (
-            <div className="p-3 bg-gray-50 rounded-lg">
-              <p className="text-sm text-gray-600">
-                Selected: {selectedFile.name}
-              </p>
-              <p className="text-xs text-gray-500">
-                Size: {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-              </p>
-            </div>
           )}
 
-          {isUploading && (
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>Processing...</span>
-                <span>{progress}%</span>
-              </div>
-              <Progress value={progress} className="w-full" />
-            </div>
-          )}
+          {uploading && <UploadProgress progress={progress} />}
 
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end space-x-2">
             <Button
               variant="outline"
-              onClick={() => setIsOpen(false)}
-              disabled={isUploading}
+              onClick={() => setOpen(false)}
+              disabled={uploading}
             >
               Cancel
             </Button>
             <Button
               onClick={handleUpload}
-              disabled={!selectedFile || isUploading}
-              className="gap-2"
+              disabled={!file || uploading}
             >
-              <Upload className="w-4 h-4" />
-              Upload & Process
+              <Upload className="w-4 h-4 mr-2" />
+              {uploading ? "Processing..." : "Upload & Process"}
             </Button>
           </div>
-        </div>
-
-        <div className="text-xs text-gray-500 space-y-1">
-          <p><strong>Expected structure:</strong></p>
-          <p>• Main folders: Biz, Health, Survivalist</p>
-          <p>• Summit folders inside each main folder</p>
-          <p>• CSV files named with engagement prefix (H-, L-, M-, U-)</p>
         </div>
       </DialogContent>
     </Dialog>
