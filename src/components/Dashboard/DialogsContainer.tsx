@@ -18,17 +18,17 @@ interface DialogsContainerProps {
   };
   selectedCategories: string[];
   allCategories: any[];
-  exportState: {
-    handleEmailCleaningProgress: (processed: number, total: number, validEmails: number) => void;
+  exportState?: {
+    handleEmailCleaningProgress?: (processed: number, total: number, validEmails: number) => void;
   };
-  categorizationState: {
-    showResultsDialog: boolean;
-    setShowResultsDialog: (show: boolean) => void;
-    categorizationResults: any;
+  categorizationState?: {
+    showResultsDialog?: boolean;
+    setShowResultsDialog?: (show: boolean) => void;
+    categorizationResults?: any;
   };
-  categorizationHandlers: {
-    handleAICategorizeAll: (contactLimit?: number) => void;
-    handleContactLimitCategorization: (contactLimit?: number) => void;
+  categorizationHandlers?: {
+    handleAICategorizeAll?: (contactLimit?: number) => void;
+    handleContactLimitCategorization?: (contactLimit?: number) => void;
   };
   onUploadComplete: () => void;
 }
@@ -49,31 +49,39 @@ export const DialogsContainer = ({
         onOpenChange={dialogState.setShowUploadDialog}
         onUploadComplete={onUploadComplete}
       />
-      <ExportDialog 
-        open={dialogState.showExportDialog} 
-        onOpenChange={dialogState.setShowExportDialog}
-        selectedCategories={selectedCategories.map(id => 
-          allCategories.find((cat: any) => cat.id === id)
-        ).filter(Boolean)}
-        onEmailCleaningProgress={exportState.handleEmailCleaningProgress}
-      />
-      <AICategorizationDialog
-        open={dialogState.showAICategorizationDialog}
-        onOpenChange={dialogState.setShowAICategorizationDialog}
-        onCategorize={categorizationHandlers.handleAICategorizeAll}
-      />
-      <ContactLimitDialog
-        open={dialogState.showContactLimitDialog}
-        onOpenChange={dialogState.setShowContactLimitDialog}
-        onCategorize={categorizationHandlers.handleContactLimitCategorization}
-        title="Auto Categorization"
-        description="Select how many contacts to categorize using rule-based logic."
-      />
-      <CategorizationResultsDialog
-        open={categorizationState.showResultsDialog}
-        onOpenChange={categorizationState.setShowResultsDialog}
-        results={categorizationState.categorizationResults}
-      />
+      {dialogState.showExportDialog && (
+        <ExportDialog 
+          open={dialogState.showExportDialog} 
+          onOpenChange={dialogState.setShowExportDialog}
+          selectedCategories={selectedCategories.map(id => 
+            allCategories.find((cat: any) => cat.id === id)
+          ).filter(Boolean)}
+          onEmailCleaningProgress={exportState?.handleEmailCleaningProgress || (() => {})}
+        />
+      )}
+      {dialogState.showAICategorizationDialog && categorizationHandlers?.handleAICategorizeAll && (
+        <AICategorizationDialog
+          open={dialogState.showAICategorizationDialog}
+          onOpenChange={dialogState.setShowAICategorizationDialog}
+          onCategorize={categorizationHandlers.handleAICategorizeAll}
+        />
+      )}
+      {dialogState.showContactLimitDialog && categorizationHandlers?.handleContactLimitCategorization && (
+        <ContactLimitDialog
+          open={dialogState.showContactLimitDialog}
+          onOpenChange={dialogState.setShowContactLimitDialog}
+          onCategorize={categorizationHandlers.handleContactLimitCategorization}
+          title="Auto Categorization"
+          description="Select how many contacts to categorize using rule-based logic."
+        />
+      )}
+      {categorizationState?.showResultsDialog && (
+        <CategorizationResultsDialog
+          open={categorizationState.showResultsDialog}
+          onOpenChange={categorizationState.setShowResultsDialog || (() => {})}
+          results={categorizationState.categorizationResults}
+        />
+      )}
     </>
   );
 };

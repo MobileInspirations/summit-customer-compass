@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -43,6 +44,32 @@ export const OptimizedDashboard = () => {
   const { data: personalityCategories = [] } = useOptimizedCategoriesByType("personality");
   const { data: bucketCounts = {}, refetch: refetchBucketCounts } = useOptimizedBucketCounts();
 
+  const exportHandlers = useExportHandlers({
+    setIsExporting: exportState.setIsExporting,
+    setExportProgress: exportState.setExportProgress,
+    selectedCategories: selectedCategories,
+    allCategories: allCategories
+  });
+
+  const categorizationHandlers = useCategorizationHandlers({
+    setIsCategorizing: categorizationState.setIsCategorizing,
+    setCategorizationProgress: categorizationState.setCategorizationProgress,
+    setCategorizationResults: categorizationState.setCategorizationResults,
+    setShowResultsDialog: categorizationState.setShowResultsDialog,
+    cancellationTokenRef: categorizationState.cancellationTokenRef,
+    resetProgress: categorizationState.resetProgress
+  });
+
+  useEffect(() => {
+    if (!user) {
+      navigate("/auth");
+    }
+  }, [user, navigate]);
+
+  if (!user) {
+    return null;
+  }
+
   const handleSignOut = async () => {
     await signOut();
     navigate("/auth");
@@ -66,33 +93,30 @@ export const OptimizedDashboard = () => {
   };
 
   const handleExport = () => {
-    // Placeholder for export logic
+    const canExport = exportHandlers.handleExport();
+    if (canExport) {
+      dialogState.setShowExportDialog(true);
+    }
   };
 
-  useEffect(() => {
-    if (!user) {
-      navigate("/auth");
-    }
-  }, [user, navigate]);
-
-  if (!user) {
-    return null;
-  }
+  const handleUploadComplete = () => {
+    // Refresh all counts after upload
+    refetchContactsCount();
+    refetchUniqueContacts();
+    refetchBucketCounts();
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
       <EnhancedDashboardHeader
         onUploadClick={() => dialogState.setShowUploadDialog(true)}
-        onViewAllContacts={() => navigate("/contacts")}
-        onSortContacts={() => {}}
-        onExportAllTags={() => {}}
+        onViewAllContacts={handleViewAllContacts}
+        onSortContacts={exportHandlers.handleSortContacts}
+        onExportAllTags={exportHandlers.handleExportAllTags}
         onCategorizeAll={() => dialogState.setShowContactLimitDialog(true)}
         onAICategorizeAll={() => dialogState.setShowAICategorizationDialog(true)}
-        onExport={() => {}}
-        onSignOut={async () => {
-          await signOut();
-          navigate("/auth");
-        }}
+        onExport={handleExport}
+        onSignOut={handleSignOut}
         selectedCategoriesCount={selectedCategories.length}
         isSorting={false}
         isExporting={exportState.isExporting}
@@ -103,7 +127,7 @@ export const OptimizedDashboard = () => {
 
       <ErrorLogButton />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px:8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <StatsCards
           totalContacts={contactsCount || 0}
           totalUniqueContacts={totalUniqueContacts}
@@ -113,10 +137,7 @@ export const OptimizedDashboard = () => {
 
         <BucketSelector 
           selectedBucket={selectedBucket}
-          onBucketChange={(bucket) => {
-            setSelectedBucket(bucket);
-            setSelectedCategories([]);
-          }}
+          onBucketChange={handleBucketChange}
           bucketCounts={bucketCounts}
         />
 
@@ -124,28 +145,31 @@ export const OptimizedDashboard = () => {
           title="Customer Categories"
           categories={customerCategories}
           selectedCategories={selectedCategories}
-          onCategorySelect={(categoryId) => {
-            setSelectedCategories(prev => 
-              prev.includes(categoryId) 
-                ? prev.filter(id => id !== categoryId)
-                : [...prev, categoryId]
-            );
-          }}
+          onCategorySelect={handleCategorySelect}
         />
 
         <CategoriesSection
           title="Personality Categories"
           categories={personalityCategories}
           selectedCategories={selectedCategories}
-          onCategorySelect={(categoryId) => {
-            setSelectedCategories(prev => 
-              prev.includes(categoryId) 
-                ? prev.filter(id => id !== categoryId)
-                : [...prev, categoryId]
-            );
-          }}
+          onCategorySelect={handleCategorySelect}
         />
       </div>
+
+      <DialogsContainer
+        dialogState={dialogState}
+        selectedCategories={selectedCategories}
+        allCategories={allCategories}
+        exportState={exportState}
+        categorizationState={categorizationState}
+        categorizationHandlers={categorizationHandlers}
+        onUploadComplete={handleUploadComplete}
+      />
+
+      <ProgressBars
+        exportState={exportState}
+        categorizationState={categorizationState}
+      />
     </div>
   );
 };

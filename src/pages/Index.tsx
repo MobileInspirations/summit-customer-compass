@@ -1,8 +1,8 @@
 
-import { Dashboard } from "@/components/Dashboard/Dashboard";
+import { OptimizedDashboard } from "@/components/Dashboard/OptimizedDashboard";
 
 const Index = () => {
-  return <Dashboard />;
+  return <OptimizedDashboard />;
 };
 
 export default Index;

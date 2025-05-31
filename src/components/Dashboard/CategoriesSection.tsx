@@ -1,11 +1,11 @@
 
 import { Badge } from "@/components/ui/badge";
 import { CategoryCard } from "@/components/CategoryCard";
-import type { Category } from "@/hooks/useCategories";
+import type { OptimizedCategory } from "@/hooks/useOptimizedCategories";
 
 interface CategoriesSectionProps {
   title: string;
-  categories: Category[];
+  categories: OptimizedCategory[];
   selectedCategories: string[];
   onCategorySelect: (categoryId: string) => void;
 }
