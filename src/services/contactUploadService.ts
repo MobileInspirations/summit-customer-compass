@@ -1,6 +1,4 @@
-
 import { supabase } from "@/integrations/supabase/client";
-import { categorizeNewContacts } from "./contactCategorizationService";
 import { ensureMainBucketsExist, assignContactsToBucket, type MainBucketId } from "./bucketCategorizationService";
 
 interface CSVContact {
@@ -60,7 +58,7 @@ export const uploadContacts = async (
       throw error;
     }
 
-    // Track uploaded emails for categorization
+    // Track uploaded emails for bucket assignment
     uploadedEmails.push(...batch.map(c => c.email));
 
     processed += batch.length;
@@ -68,10 +66,10 @@ export const uploadContacts = async (
   }
 
   console.log('Assigning contacts to main bucket...');
-  onProgress(50);
+  onProgress(70);
 
   try {
-    // Assign contacts to the selected main bucket
+    // Assign contacts to the selected main bucket only
     await assignContactsToBucket(uploadedEmails, selectedBucket);
     console.log('Main bucket assignment completed');
   } catch (error) {
@@ -79,18 +77,6 @@ export const uploadContacts = async (
     // Don't fail the entire upload if bucket assignment fails
   }
 
-  onProgress(70);
-
-  console.log('Starting automatic categorization...');
-
-  try {
-    // Automatically categorize the uploaded contacts
-    await categorizeNewContacts(uploadedEmails);
-    console.log('Automatic categorization completed');
-  } catch (error) {
-    console.error('Error during categorization:', error);
-    // Don't fail the entire upload if categorization fails
-  }
-
   onProgress(100);
+  console.log('Upload completed - contacts assigned to main bucket only, no automatic categorization performed');
 };

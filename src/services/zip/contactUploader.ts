@@ -1,7 +1,6 @@
 
 import { type ProcessedContact } from "./csvProcessor";
 import { mergeContactsByEmail } from "./contactMerger";
-import { categorizeNewContacts } from "../helpers/newContactCategorization";
 import { type MainBucketId } from "../bucketCategorizationService";
 import { upsertContactBatch, upsertContactWithProperMerging } from "./batchOperations";
 import { assignContactsToBucketChunked } from "./bucketAssignment";
@@ -20,9 +19,9 @@ export const uploadContactsInBatches = async (
     `${bucket}: ${contactsByBucket[bucket as keyof typeof contactsByBucket].length}`
   ));
 
-  // Phase 1: Upload and merge contacts (50-80% of progress)
+  // Upload and assign to buckets (50-100% of progress)
   const uploadPhaseStart = 50;
-  const uploadPhaseEnd = 80;
+  const uploadPhaseEnd = 100;
   const uploadPhaseRange = uploadPhaseEnd - uploadPhaseStart;
 
   for (const bucket of allBuckets) {
@@ -60,7 +59,7 @@ export const uploadContactsInBatches = async (
 
         // Update progress more frequently for better UX
         const currentProgress = uploadPhaseStart + Math.round((totalProcessed / totalContacts) * uploadPhaseRange);
-        onProgress(Math.min(currentProgress, uploadPhaseEnd - 1)); // Never exceed phase end
+        onProgress(Math.min(currentProgress, uploadPhaseEnd - 5)); // Leave room for bucket assignment
         console.log(`Progress: ${currentProgress}% (${totalProcessed}/${totalContacts} contacts)`);
         
       } catch (error) {
@@ -91,34 +90,7 @@ export const uploadContactsInBatches = async (
     }
   }
 
-  // Phase 2: Categorization (80-100% of progress)
-  console.log('=== Starting categorization phase ===');
-  onProgress(85);
-  
-  try {
-    const allUploadedEmails = Object.values(contactsByBucket)
-      .flat()
-      .map(contact => contact.email);
-    
-    console.log(`Starting categorization for ${allUploadedEmails.length} contacts`);
-    
-    // For large datasets, we'll do a simpler categorization approach
-    if (allUploadedEmails.length > 50000) {
-      console.log('Large dataset detected, using simplified categorization');
-      onProgress(95);
-      // Skip automatic categorization for very large datasets to prevent timeouts
-      console.log('Skipping automatic categorization for large dataset to prevent timeout');
-    } else {
-      await categorizeNewContacts(allUploadedEmails);
-      console.log('Categorization completed successfully');
-    }
-    
-    onProgress(100);
-  } catch (error) {
-    console.error('Error during categorization:', error);
-    console.log('Categorization failed, but upload was successful');
-    onProgress(100); // Still complete the upload even if categorization fails
-  }
-  
+  onProgress(100);
   console.log('=== uploadContactsInBatches completed ===');
+  console.log('Note: No automatic categorization performed - contacts only assigned to main buckets based on folder structure');
 };

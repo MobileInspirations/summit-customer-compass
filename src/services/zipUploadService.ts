@@ -47,8 +47,8 @@ export const processZipUpload = async (
     ));
     onProgress(50);
 
-    // Upload contacts in batches with proper merging
-    console.log('=== Starting batch upload phase ===');
+    // Upload contacts and assign to main buckets only (no categorization)
+    console.log('=== Starting batch upload phase (main bucket assignment only) ===');
     try {
       await uploadContactsInBatches(contactsByBucket, onProgress);
       console.log('Batch upload completed successfully');
@@ -59,6 +59,7 @@ export const processZipUpload = async (
     
     onProgress(100);
     console.log('=== ZIP file processing completed successfully ===');
+    console.log('Note: Contacts have been uploaded and assigned to main buckets only. No automatic categorization was performed.');
   } catch (error) {
     console.error('=== ERROR during ZIP processing ===', error);
     throw error;
