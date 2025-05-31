@@ -1,73 +1,141 @@
-# Welcome to your Lovable project
+# Summit Customer Compass
 
-## Project info
+A modern web application for efficient contact categorization and management, built with React, FastAPI, and PostgreSQL.
 
-**URL**: https://lovable.dev/projects/ad739134-42d9-4497-84f1-7d2c37758e3c
+## Features
 
-## How can I edit this code?
+- Contact upload via CSV files
+- Automated contact categorization
+- Real-time categorization progress tracking
+- Filterable and paginated contact list
+- Modern, responsive UI with Tailwind CSS
 
-There are several ways of editing your application.
+## Tech Stack
 
-**Use Lovable**
+### Frontend
+- React 18 with TypeScript
+- Vite for build tooling
+- Tailwind CSS for styling
+- React Router for navigation
+- React Query for data fetching
+- Sonner for toast notifications
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/ad739134-42d9-4497-84f1-7d2c37758e3c) and start prompting.
+### Backend
+- FastAPI (Python)
+- SQLAlchemy ORM
+- PostgreSQL database
+- Async batch processing
+- RESTful API design
 
-Changes made via Lovable will be committed automatically to this repo.
+## Prerequisites
 
-**Use your preferred IDE**
+- Python 3.8+
+- Node.js 16+
+- PostgreSQL 12+
+- Git
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## Setup
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/summit-customer-compass.git
+cd summit-customer-compass
+```
 
-Follow these steps:
+2. Backend Setup:
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+```
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+3. Frontend Setup:
+```bash
+cd frontend
+npm install
+```
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+4. Environment Configuration:
 
-# Step 3: Install the necessary dependencies.
-npm i
+Create `.env` files in both backend and frontend directories:
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+Backend (.env):
+```
+DATABASE_URL=postgresql://user:password@localhost:5432/customer_compass
+SUPABASE_URL=your_supabase_url
+SUPABASE_SERVICE_KEY=your_supabase_service_key
+```
+
+Frontend (.env):
+```
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+## Running the Application
+
+1. Start the backend server:
+```bash
+cd backend
+uvicorn app.main:app --reload
+```
+
+2. Start the frontend development server:
+```bash
+cd frontend
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+The application will be available at:
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:8000
+- API Documentation: http://localhost:8000/docs
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Development
 
-**Use GitHub Codespaces**
+### Project Structure
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+```
+summit-customer-compass/
+├── backend/
+│   ├── app/
+│   │   ├── api/
+│   │   ├── core/
+│   │   ├── models/
+│   │   └── services/
+│   ├── requirements.txt
+│   └── .env
+├── frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   ├── pages/
+│   │   └── App.tsx
+│   ├── package.json
+│   └── .env
+└── README.md
+```
 
-## What technologies are used for this project?
+### Available Scripts
 
-This project is built with:
+Frontend:
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run lint` - Run ESLint
+- `npm run preview` - Preview production build
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+Backend:
+- `uvicorn app.main:app --reload` - Start development server
+- `pytest` - Run tests
 
-## How can I deploy this project?
+## Contributing
 
-Simply open [Lovable](https://lovable.dev/projects/ad739134-42d9-4497-84f1-7d2c37758e3c) and click on Share -> Publish.
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-## Can I connect a custom domain to my Lovable project?
+## License
 
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+This project is licensed under the MIT License - see the LICENSE file for details.
