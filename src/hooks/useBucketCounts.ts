@@ -11,63 +11,55 @@ export const useBucketCounts = () => {
 
       // Get counts for each main bucket using unique contacts
       for (const bucket of Object.values(MAIN_BUCKETS)) {
-        // Use the bucket ID directly to find the category (this matches how assignContactsToBucket works)
-        const { data: category, error: categoryError } = await supabase
-          .from('customer_categories')
-          .select('id')
-          .eq('name', bucket.name) // This should match the actual category name in the database
-          .single();
-
-        if (categoryError || !category) {
-          console.error('Error finding bucket category:', bucket.name, categoryError);
-          
-          // Try to find by the bucket ID pattern instead
-          const { data: categoryById, error: categoryByIdError } = await supabase
+        try {
+          // First, try to find the category by exact name match
+          let { data: category, error: categoryError } = await supabase
             .from('customer_categories')
             .select('id')
-            .ilike('name', `%${bucket.id}%`)
-            .single();
+            .eq('name', bucket.name)
+            .maybeSingle();
+
+          // If not found by name, try finding by bucket ID pattern
+          if (!category) {
+            const { data: categoryById, error: categoryByIdError } = await supabase
+              .from('customer_categories')
+              .select('id')
+              .ilike('name', `%${bucket.id}%`)
+              .maybeSingle();
             
-          if (categoryByIdError || !categoryById) {
-            console.error('Error finding bucket category by ID pattern:', bucket.id, categoryByIdError);
+            if (categoryById) {
+              category = categoryById;
+            }
+          }
+
+          if (!category) {
+            console.log(`No category found for bucket: ${bucket.name} (${bucket.id})`);
             bucketCounts[bucket.id] = 0;
             continue;
           }
-          
-          // Count unique contacts in this category
-          const { data: uniqueContacts, error: countError } = await supabase
+
+          // Get all contact_category records for this category
+          const { data: contactCategories, error: countError } = await supabase
             .from('contact_categories')
-            .select('contact_id', { count: 'exact' })
-            .eq('category_id', categoryById.id);
+            .select('contact_id')
+            .eq('category_id', category.id);
 
           if (countError) {
             console.error('Error counting contacts for bucket:', bucket.id, countError);
             bucketCounts[bucket.id] = 0;
           } else {
             // Count unique contact IDs
-            const uniqueContactIds = new Set(uniqueContacts?.map(cc => cc.contact_id) || []);
+            const uniqueContactIds = new Set(contactCategories?.map(cc => cc.contact_id) || []);
             bucketCounts[bucket.id] = uniqueContactIds.size;
+            console.log(`Bucket ${bucket.id}: ${contactCategories?.length || 0} total records, ${uniqueContactIds.size} unique contacts`);
           }
-          continue;
-        }
-
-        // Count unique contacts in this category
-        const { data: uniqueContacts, error: countError } = await supabase
-          .from('contact_categories')
-          .select('contact_id', { count: 'exact' })
-          .eq('category_id', category.id);
-
-        if (countError) {
-          console.error('Error counting contacts for bucket:', bucket.name, countError);
+        } catch (error) {
+          console.error(`Error processing bucket ${bucket.id}:`, error);
           bucketCounts[bucket.id] = 0;
-        } else {
-          // Count unique contact IDs
-          const uniqueContactIds = new Set(uniqueContacts?.map(cc => cc.contact_id) || []);
-          bucketCounts[bucket.id] = uniqueContactIds.size;
         }
       }
 
-      console.log('Unique bucket counts calculated:', bucketCounts);
+      console.log('Final unique bucket counts calculated:', bucketCounts);
       return bucketCounts;
     },
   });

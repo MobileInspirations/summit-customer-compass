@@ -6,7 +6,7 @@ export const useTotalUniqueContacts = () => {
   return useQuery({
     queryKey: ["total-unique-contacts"],
     queryFn: async () => {
-      // Get all unique contact IDs that are assigned to any category
+      // Get count of unique contact IDs that are assigned to any category
       const { data: categorizedContacts, error } = await supabase
         .from('contact_categories')
         .select('contact_id');
@@ -20,6 +20,7 @@ export const useTotalUniqueContacts = () => {
       const uniqueContactIds = new Set(categorizedContacts?.map(cc => cc.contact_id) || []);
       const totalUniqueContacts = uniqueContactIds.size;
       
+      console.log('Total categorized contact records:', categorizedContacts?.length || 0);
       console.log('Total unique categorized contacts:', totalUniqueContacts);
       return totalUniqueContacts;
     },
