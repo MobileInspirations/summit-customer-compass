@@ -1,5 +1,7 @@
+
 import { supabase } from "@/integrations/supabase/client";
-import { ensureMainBucketsExist, assignContactsToBucket, type MainBucketId } from "./bucketCategorizationService";
+import { ensureMainBucketsExist, type MainBucketId } from "./bucketCategorizationService";
+import { assignContactsToBucketChunked } from "./zip/bucketAssignment";
 
 interface CSVContact {
   email: string;
@@ -43,7 +45,7 @@ export const uploadContacts = async (
       summit_history: contact.summit_history ? contact.summit_history.split(';').filter(Boolean) : []
     }));
 
-    console.log(`Inserting batch ${Math.floor(i / batchSize) + 1}:`, contactsToInsert);
+    console.log(`Inserting batch ${Math.floor(i / batchSize) + 1}:`, contactsToInsert.length, 'contacts');
 
     // Insert batch with upsert to handle duplicates
     const { error } = await supabase
@@ -65,18 +67,18 @@ export const uploadContacts = async (
     onProgress(15 + (processed / uniqueContacts.length) * 35); // 15-50% for upload
   }
 
-  console.log('Assigning contacts to main bucket...');
+  console.log('Assigning contacts to main bucket using chunked approach...');
   onProgress(70);
 
   try {
-    // Assign contacts to the selected main bucket only
-    await assignContactsToBucket(uploadedEmails, selectedBucket);
-    console.log('Main bucket assignment completed');
+    // Use the chunked approach for bucket assignment
+    await assignContactsToBucketChunked(uploadedEmails, selectedBucket);
+    console.log(`Successfully assigned ${uploadedEmails.length} contacts to ${selectedBucket} bucket`);
   } catch (error) {
     console.error('Error during bucket assignment:', error);
-    // Don't fail the entire upload if bucket assignment fails
+    throw error; // Fail the upload if bucket assignment fails
   }
 
   onProgress(100);
-  console.log('Upload completed - contacts assigned to main bucket only, no automatic categorization performed');
+  console.log('CSV upload completed - contacts assigned to selected bucket:', selectedBucket);
 };
