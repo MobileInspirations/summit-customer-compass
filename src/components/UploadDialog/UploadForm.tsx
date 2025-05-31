@@ -10,7 +10,7 @@ import { UploadProgress } from "@/components/UploadProgress";
 import { FileUploadSection } from "./FileUploadSection";
 import type { MainBucketId } from "@/services/bucketCategorizationService";
 
-// Simple CSV parser function for single file uploads
+// Enhanced CSV parser function for single file uploads
 const parseCSV = (csvContent: string) => {
   const lines = csvContent.split('\n').filter(line => line.trim());
   if (lines.length <= 1) return [];
@@ -32,12 +32,12 @@ const parseCSV = (csvContent: string) => {
     const email = values[emailIndex];
     
     if (email && email.includes('@')) {
-      // Extract summit history from CSV if available
+      // Enhanced summit history extraction from CSV
       let summitHistory: string[] = [];
       if (summitHistoryIndex !== -1 && values[summitHistoryIndex]) {
-        // Split by semicolon or comma to support multiple summits
+        // Split by semicolon, comma, or pipe to support multiple summit formats
         summitHistory = values[summitHistoryIndex]
-          .split(/[;,]/)
+          .split(/[;,|]/)
           .map(s => s.trim())
           .filter(s => s.length > 0);
       }
@@ -46,7 +46,7 @@ const parseCSV = (csvContent: string) => {
         email,
         name: nameIndex !== -1 ? values[nameIndex] : '',
         company: companyIndex !== -1 ? values[companyIndex] : '',
-        summit_history: summitHistory.length > 0 ? summitHistory.join(';') : undefined
+        summit_history: summitHistory
       });
     }
   }
@@ -113,6 +113,12 @@ export const UploadForm = ({ onClose, onUploadComplete, bucketCounts }: UploadFo
         if (contacts.length === 0) {
           throw new Error("No valid contacts found in CSV file. Please ensure your CSV has an 'Email' column with valid email addresses.");
         }
+
+        console.log('Parsed contacts with summit history:', contacts.map(c => ({ 
+          email: c.email, 
+          summitHistoryCount: c.summit_history.length,
+          summitHistory: c.summit_history 
+        })));
 
         setProgress(10);
         
