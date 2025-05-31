@@ -6,6 +6,9 @@ export interface Category {
   name: string;
   description?: string;
   color: string;
+  category_type: string;
+  created_at: string;
+  updated_at: string;
   count: number;
 }
 
@@ -18,7 +21,10 @@ export const fetchAllCategories = async (): Promise<Category[]> => {
       id,
       name,
       description,
-      color
+      color,
+      category_type,
+      created_at,
+      updated_at
     `);
 
   if (error) {
@@ -41,6 +47,9 @@ export const fetchAllCategories = async (): Promise<Category[]> => {
           name: category.name,
           description: category.description,
           color: category.color,
+          category_type: category.category_type,
+          created_at: category.created_at,
+          updated_at: category.updated_at,
           count: 0
         };
       }
@@ -50,6 +59,9 @@ export const fetchAllCategories = async (): Promise<Category[]> => {
         name: category.name,
         description: category.description,
         color: category.color,
+        category_type: category.category_type,
+        created_at: category.created_at,
+        updated_at: category.updated_at,
         count: count || 0
       };
     })
