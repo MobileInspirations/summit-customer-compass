@@ -99,6 +99,7 @@ const Index = () => {
     }
   };
 
+  // Regular rule-based categorization (NO AI, NO API KEY REQUIRED)
   const handleCategorizeAll = async () => {
     setIsCategorizing(true);
     setCategorizationProgress({
@@ -113,9 +114,16 @@ const Index = () => {
     cancellationTokenRef.current = new CancellationToken();
 
     try {
-      await categorizeContacts(undefined, (progress) => {
-        setCategorizationProgress(progress);
-      }, false, undefined, cancellationTokenRef.current);
+      // Call categorizeContacts with useAI = false and no API key
+      await categorizeContacts(
+        undefined, // contactIds
+        (progress) => {
+          setCategorizationProgress(progress);
+        }, 
+        false, // useAI = false for regular categorization
+        undefined, // no API key needed
+        cancellationTokenRef.current
+      );
       queryClient.invalidateQueries({ queryKey: ["categories"] });
       toast({
         title: "Categorization complete",
@@ -147,6 +155,7 @@ const Index = () => {
     }
   };
 
+  // AI-based categorization (REQUIRES API KEY)
   const handleAICategorizeAll = async (apiKey: string, contactLimit?: number) => {
     setIsCategorizing(true);
     setCategorizationProgress({
@@ -161,9 +170,17 @@ const Index = () => {
     cancellationTokenRef.current = new CancellationToken();
 
     try {
-      await categorizeContacts(undefined, (progress) => {
-        setCategorizationProgress(progress);
-      }, true, apiKey, cancellationTokenRef.current, contactLimit);
+      // Call categorizeContacts with useAI = true and the provided API key
+      await categorizeContacts(
+        undefined, // contactIds
+        (progress) => {
+          setCategorizationProgress(progress);
+        }, 
+        true, // useAI = true for AI categorization
+        apiKey, // API key provided by user
+        cancellationTokenRef.current, 
+        contactLimit
+      );
       queryClient.invalidateQueries({ queryKey: ["categories"] });
       toast({
         title: "AI Categorization complete",
