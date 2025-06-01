@@ -107,6 +107,22 @@ export const categorizeContactEnhanced = async (
     } else {
       console.log(`No non-main-bucket categories matched for contact: ${contact.email} (main bucket remains unchanged)`);
     }
+
+    // Mark contact as categorized
+    const { error: updateError } = await supabase
+      .from('contacts')
+      .update({
+        is_categorized: true,
+        categorized_at: new Date().toISOString()
+      })
+      .eq('id', contact.id);
+
+    if (updateError) {
+      console.error(`Error marking contact as categorized: ${contact.email}`, updateError);
+    } else {
+      console.log(`Marked contact ${contact.email} as categorized`);
+    }
+
   } catch (error) {
     console.error(`Error in categorizeContactEnhanced for ${contact.email}:`, error);
     throw error;

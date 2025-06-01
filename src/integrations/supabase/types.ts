@@ -47,34 +47,40 @@ export type Database = {
       }
       contacts: {
         Row: {
+          categorized_at: string | null
           company: string | null
           created_at: string
           email: string
           engagement_level: string | null
           full_name: string | null
           id: string
+          is_categorized: boolean | null
           main_bucket: string
           summit_history: string[] | null
           updated_at: string
         }
         Insert: {
+          categorized_at?: string | null
           company?: string | null
           created_at?: string
           email: string
           engagement_level?: string | null
           full_name?: string | null
           id?: string
+          is_categorized?: boolean | null
           main_bucket: string
           summit_history?: string[] | null
           updated_at?: string
         }
         Update: {
+          categorized_at?: string | null
           company?: string | null
           created_at?: string
           email?: string
           engagement_level?: string | null
           full_name?: string | null
           id?: string
+          is_categorized?: boolean | null
           main_bucket?: string
           summit_history?: string[] | null
           updated_at?: string
